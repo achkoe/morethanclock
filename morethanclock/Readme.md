@@ -16,6 +16,7 @@
     arduino-cli lib install <libname>
 
     Required libraries are:
+    - BME280: https://github.com/adafruit/Adafruit_BME280_Library
     - DCF77: https://playground.arduino.cc/Code/DCF77/
     - Time: https://playground.arduino.cc/Code/Time/
     - u8g2: https://github.com/olikraus/u8g2/wiki
