@@ -21,7 +21,7 @@ int8_t xpos_2 = -66;
 int8_t dir_1 = +1;
 int8_t dir_2 = -1;
 int8_t cnt = 0;
-
+char* day_of_week[8] = {"", "So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"};
 
 // Non-inverted input on pin DCF_PIN
 DCF77 DCF = DCF77(DCF_PIN,DCF_INTERRUPT, true);
@@ -29,7 +29,8 @@ DCF77 DCF = DCF77(DCF_PIN,DCF_INTERRUPT, true);
 // SH1106 ADC5/PC5/SCL, PC4/ADC4/SDA
 // U8G2_SH1106_128X64_NONAME_F_SW_I2C(rotation, clock, data [, reset]) [full framebuffer, size = 1024 bytes]
 //U8G2_SH1106_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, 6, 7);
-U8G2_SH1106_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, A5, A4, U8X8_PIN_NONE);
+//U8G2_SH1106_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, A5, A4, U8X8_PIN_NONE);
+U8G2_SH1106_128X64_NONAME_1_HW_I2C u8g2(U8G2_R2, A5, A4, U8X8_PIN_NONE);
 
 BME280I2C bme;
 
@@ -39,8 +40,6 @@ BME280I2C bme;
 void setup() {
 
     Serial.begin(115200);
-//    while (Serial.available() <= 0) {}
-//    Serial.read();
     Wire.begin();
     u8g2.begin();
 
@@ -50,8 +49,6 @@ void setup() {
     }
 
     DCF.Start();
-    // Serial.println("Wait DCF77");
-    // Serial.println("It will take at least 2 minutes before a first time update.");
 }
 
 void loop() {
@@ -70,11 +67,11 @@ void loop() {
     if (current_second != last_second) {
         last_second = current_second;
         sprintf(time_str, "%d:%02d:%02d", hour(), minute(), current_second);
-        sprintf(date_str, "%d.%d.%d", day(), month(), year());
+        sprintf(date_str, "%s, %d.%d.%d", day_of_week[weekday()], day(), month(), year());
 
         if (xpos_1 + u8g2.getStrWidth(time_str) > 126) {
             dir_1 = -1;
-        } else if (xpos_1 < 0) {
+        } else if (xpos_1 < 1) {
             dir_1 = +1;
         }
         xpos_1 += dir_1;
@@ -93,7 +90,6 @@ void loop() {
         //u8g2.updateDisplay();
         u8g2.firstPage();
         do {
-            //u8g2.setFont(u8g2_font_ncenB14_tr);
             u8g2.setFont(u8g2_font_crox4hb_tn);
             u8g2.drawStr(xpos_1, 24, time_str);
             u8g2.setFont(u8g2_font_crox1cb_tf);
