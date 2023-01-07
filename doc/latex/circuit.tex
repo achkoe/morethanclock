@@ -1,0 +1,227 @@
+\documentclass[a4paper]{article}
+\usepackage[textwidth=20cm, lmargin=0cm, rmargin=0cm ]{geometry}
+
+\usepackage{tikz}
+\usetikzlibrary {circuits.ee.IEC}
+\begin{document}
+\thispagestyle{empty}
+
+\tikzset{wire/.style={color=blue}}
+\tikzset{case/.style={color=black, very thick}}
+\tikzset{circuit declare symbol=vdd, set vdd graphic={draw,shape=rectangle,minimum size=1mm}}
+
+\begin{tikzpicture}[scale=0.3, circuit ee IEC]]
+
+    \draw[step=1cm,blue,very thin, color=green] (-17,-3) grid (+21,34);
+
+    % --- ATMEGA328 ---
+    \begin{scope}[yshift=0cm]
+    \node at (-2, 15 - 1) [circle, draw, scale=0.3, label=right:{\tiny 1}] (ATMEGA1) {};
+    \node at (-2, 15 - 2) [circle, draw, scale=0.3, label=right:{\tiny 2}] (ATMEGA2) {};
+    \node at (-2, 15 - 3) [circle, draw, scale=0.3, label=right:{\tiny 3}] (ATMEGA3) {};
+    \node at (-2, 15 - 4) [circle, draw, scale=0.3, label=right:{\tiny 4}] (ATMEGA4) {};
+    \node at (-2, 15 - 5) [circle, draw, scale=0.3, label=right:{\tiny 5}] (ATMEGA5) {};
+    \node at (-2, 15 - 6) [circle, draw, scale=0.3, label=right:{\tiny 6}] (ATMEGA6) {};
+    \node at (-2, 15 - 7) [circle, draw, scale=0.3, label=right:{\tiny 7}] (ATMEGA7) {};
+    \node at (-2, 15 - 8) [circle, draw, scale=0.3, label=right:{\tiny 8}] (ATMEGA8) {};
+    \node at (-2, 15 - 9) [circle, draw, scale=0.3, label=right:{\tiny 9}] (ATMEGA9) {};
+    \node at (-2, 15 - 10) [circle, draw, scale=0.3, label=right:{\tiny 10}] (ATMEGA10) {};
+    \node at (-2, 15 - 11) [circle, draw, scale=0.3, label=right:{\tiny 11}] (ATMEGA11) {};
+    \node at (-2, 15 - 12) [circle, draw, scale=0.3, label=right:{\tiny 12}] (ATMEGA12) {};
+    \node at (-2, 15 - 13) [circle, draw, scale=0.3, label=right:{\tiny 13}] (ATMEGA13) {};
+    \node at (-2, 15 - 14) [circle, draw, scale=0.3, label=right:{\tiny 14}] (ATMEGA14) {};
+
+    \node at (+2, 15 - 1) [circle, draw, scale=0.3, label=left:{\tiny 28}] (ATMEGA28) {};
+    \node at (+2, 15 - 2) [circle, draw, scale=0.3, label=left:{\tiny 27}] (ATMEGA27) {};
+    \node at (+2, 15 - 3) [circle, draw, scale=0.3, label=left:{\tiny 26}] (ATMEGA26) {};
+    \node at (+2, 15 - 4) [circle, draw, scale=0.3, label=left:{\tiny 25}] (ATMEGA25) {};
+    \node at (+2, 15 - 5) [circle, draw, scale=0.3, label=left:{\tiny 24}] (ATMEGA24) {};
+    \node at (+2, 15 - 6) [circle, draw, scale=0.3, label=left:{\tiny 23}] (ATMEGA23) {};
+    \node at (+2, 15 - 7) [circle, draw, scale=0.3, label=left:{\tiny 22}] (ATMEGA22) {};
+    \node at (+2, 15 - 8) [circle, draw, scale=0.3, label=left:{\tiny 21}] (ATMEGA21) {};
+    \node at (+2, 15 - 9) [circle, draw, scale=0.3, label=left:{\tiny 20}] (ATMEGA20) {};
+    \node at (+2, 15 - 10) [circle, draw, scale=0.3, label=left:{\tiny 19}] (ATMEGA19) {};
+    \node at (+2, 15 - 11) [circle, draw, scale=0.3, label=left:{\tiny 18}] (ATMEGA18) {};
+    \node at (+2, 15 - 12) [circle, draw, scale=0.3, label=left:{\tiny 17}] (ATMEGA17) {};
+    \node at (+2, 15 - 13) [circle, draw, scale=0.3, label=left:{\tiny 16}] (ATMEGA16) {};
+    \node at (+2, 15 - 14) [circle, draw, scale=0.3, label=left:{\tiny 15}] (ATMEGA15) {};
+    \draw[case] (-2 + 0.3, 0.5) rectangle(+2 - 0.3, 14.5);
+    \draw(0, 7)  node[rotate=90]{ATMEGA328};
+    \end{scope}
+
+    % --- LCD Display ---
+    \begin{scope}[yshift=17cm]
+    %\coordinate {A} at {}
+    \draw[case] (-10.5, 0) rectangle(10, 8);
+    \draw (0, 4) node {LCD};
+    \node at (-9, 8-1) [circle, draw, scale=0.3, label=left:{\tiny 14}] (LCD14_DB7) {};
+    \node at (-9, 8-2) [circle, draw, scale=0.3] (LCD12_DB5) {};
+    \node at (-9, 8-3) [circle, draw, scale=0.3] (LCD10_DB3) {};
+    \node at (-9, 8-4) [circle, draw, scale=0.3] (LCD8_DB1) {};
+    \node at (-9, 8-5) [circle, draw, scale=0.3] (LCD6_E) {};
+    \node at (-9, 8-6) [circle, draw, scale=0.3] (LCD4_RS) {};
+    \node at (-9, 8-7) [circle, draw, scale=0.3, label=left:{\tiny 2}] (LCD2_VSS) {};
+
+    \node at (-8, 8-1) [circle, draw, scale=0.3, label=right:{\tiny 13}] (LCD13_DB6) {};
+    \node at (-8, 8-2) [circle, draw, scale=0.3] (LCD11_DB4) {};
+    \node at (-8, 8-3) [circle, draw, scale=0.3] (LCD9_DB2) {};
+    \node at (-8, 8-4) [circle, draw, scale=0.3] (LCD7_DB0) {};
+    \node at (-8, 8-5) [circle, draw, scale=0.3] (LCD5_RW) {};
+    \node at (-8, 8-6) [circle, draw, scale=0.3] (LCD3_VO) {};
+    \node at (-8, 8-7) [circle, draw, scale=0.3, label=right:{\tiny 1}] (LCD1_VDD) {};
+    \end{scope}
+
+    % --- LED Display ---
+    \begin{scope}[yshift=27cm]
+    \draw[case] (-10.5, 0) rectangle(10, 6);
+    \draw (0, 3) node {LED Display};
+    \node at (9, 5) [circle, draw, scale=0.3, label=left:{\tiny VCC}] (LED_VCC) {};
+    \node at (9, 4) [circle, draw, scale=0.3, label=left:{\tiny GND}] (LED_GND) {};
+    \node at (9, 3) [circle, draw, scale=0.3, label=left:{\tiny DIN}] (LED_DIN) {};
+    \node at (9, 2) [circle, draw, scale=0.3, label=left:{\tiny CS}] (LED_CS) {};
+    \node at (9, 1) [circle, draw, scale=0.3, label=left:{\tiny CLK}] (LED_CLK) {};
+    \end{scope}
+
+    % --- PROG CONNECTOR ---
+    \begin{scope}[yshift=0.5cm, xshift=5cm]
+    \draw[case] (0, 0) rectangle(4,2);
+    \node at (1,0.5) [circle, draw, scale=0.3, label=left:{\tiny $1$}] (PROG_1) {};
+    \node at (1,1.5) [circle, draw, scale=0.3, label=left:{\tiny $2$}] (PROG_2) {};
+    \node at (2,0.5) [circle, draw, scale=0.3, label=left:{}] (PROG_3) {};
+    \node at (2,1.5) [circle, draw, scale=0.3, label=left:{}] (PROG_4) {};
+    \node at (3,0.5) [circle, draw, scale=0.3, label=left:{}] (PROG_5) {};
+    \node at (3,1.5) [circle, draw, scale=0.3, label=left:{}] (PROG_6) {};
+    \end{scope}
+
+    % --- DCF77 ---
+    \begin{scope}[yshift=17cm, xshift=14cm]
+    \draw[case] (0, 0) rectangle(5, 5);
+    \draw (2.5, 4) node {DCF77};
+    \node at (1,0.5) [circle, draw, scale=0.3, label={[label distance=0cm,text depth=1ex, rotate=90]right:\tiny Q}] (DCF_Q) {};
+    \node at (2,0.5) [circle, draw, scale=0.3, label={[label distance=0cm,text depth=1ex, rotate=90]right:\tiny E}] (DCF_E) {};
+    \node at (3,0.5) [circle, draw, scale=0.3, label={[label distance=0cm,text depth=1ex, rotate=90]right:\tiny GND}] (DCF_GND) {};
+    \node at (4,0.5) [circle, draw, scale=0.3, label={[label distance=0cm,text depth=1ex, rotate=90]right:\tiny VDD}] (DCF_VDD) {};
+    \end{scope}
+
+    % --- SUPPLY ---
+    \begin{scope}[yshift=27cm, xshift=14cm]
+    \draw[case] (0, 0) rectangle(5, 5);
+    \draw (2.5, 4) node {3V3};
+    \node at (1,0.5) [circle, draw, scale=0.3, label={[label distance=0cm,text depth=1ex, rotate=90]right:\tiny +5V}] (SUPPLY_IN) {};
+    \node at (2,0.5) [circle, draw, scale=0.3, label={[label distance=0cm,text depth=1ex, rotate=90]right:\tiny GND}] (SUPPLY_GND1) {};
+    \node at (3,0.5) [circle, draw, scale=0.3, label={[label distance=0cm,text depth=1ex, rotate=90]right:\tiny GND}] (SUPPLY_GND2) {};
+    \node at (4,0.5) [circle, draw, scale=0.3, label={[label distance=0cm,text depth=1ex, rotate=90]right:\tiny +3V3}] (SUPPLY_OUT) {};
+    \end{scope}
+
+    \node (R1) [resistor,point up,info={\tiny $R_1$}] at (15,10) {};
+    \node (R2) [resistor,point up,info'={\tiny $R_2$}] at (17,10) {};
+    \node (D)  [diode, point down, scale=2] at (17,7) {};
+    \draw[->] (17.5,7.5) -- +(0.5,0.5);
+    \draw[->] (17.5,7.0) -- +(0.5,0.5);
+    \node (CO1) [contact] at (15,14) {};
+    \node (GND1) [ground, point down] at (17,3) {};
+    \node (VDD1) [vdd, info={\tiny $V_{DD}$}] at (17,12) {};
+
+    %--- Transistor ---
+    \node at (16, 5) [draw, scale=0.01] (Q_B) {};
+    \node at (17, 6) [draw, scale=0.01] (Q_C) {};
+    \node at (17, 4) [draw, scale=0.01] (Q_E) {};
+    \draw (Q_B) -- (Q_C);
+    \draw[->] (Q_B) -- (Q_E);
+    \draw[thick] (16, 4.5) -- (16, 5.5);
+
+    %--- XTAL stuff ---
+    \node (C1) [capacitor, point up, info={\tiny $C_1$}] at (-9, -1) {};
+    \node (C2) [capacitor, point up, info'={\tiny $C_2$}] at (-6, -1) {};
+    \node (CO2) [contact] at (-6,15-10) {};
+    \node (CO3) [contact] at (-9,15-10) {};
+    \node (GND2) [ground, point down] at (-6,-2) {};
+    \node (GND3) [ground, point down] at (-9,-2) {};
+    \node at (-7, 15 - 10) [draw, scale=0.01] (XTAL1) {};
+    \node at (-8, 15 - 10) [draw, scale=0.01] (XTAL2) {};
+    \draw (-7, 5.4) -- (-7, 4.6);
+    \draw (-8, 5.4) -- (-8, 4.6);
+    \draw (-7.8,5.5) rectangle(-7.2, 4.5);
+
+    \draw[wire] (ATMEGA10) -- (XTAL1);
+    \draw[wire] (ATMEGA9) -- +(-7, 0) -- +(-7, -1) -- (XTAL2);
+    \draw[wire] (CO2) -- (C2);
+    \draw[wire] (CO3) -- (C1);
+    \draw[wire] (GND3) -- (C1);
+    \draw[wire] (GND2) -- (C2);
+
+    % --- Wires for transistor
+    \draw[wire] (R1) -- (DCF_Q);
+    \draw[wire] (R1) |- (Q_B);
+    \draw[wire] (D) -- (R2);
+    \draw[wire] (D) -- (Q_C);
+    \draw[wire] (GND1) -- (Q_E);
+    \draw[wire] (VDD1) -- (R2);
+
+
+    % --- Wires from ATMEGA to LCD ---
+    \draw[wire] (LCD4_RS) -- +(-2.5, 0) -- +(-2.5, -8) -- (ATMEGA4);
+    \draw[wire] (LCD5_RW)  -- +(-0.5,-0.5) -- +(-4,-0.5) -- +(-4, -10) -- (ATMEGA5);
+    \draw[wire] (LCD6_E) -- +(-3.5,0) -- +(-3.5, -11) -- (ATMEGA6);
+    \draw[wire] (ATMEGA11) -- +(-11.0, 0) -- +(-11.0, 18.5) -- +(-6.5, 18.5) -- (LCD11_DB4);
+    \draw[wire] (ATMEGA12) -- +(-11.5, 0) -- +(-11.5, 20.0) -- (LCD12_DB5);
+    \draw[wire] (ATMEGA13) -- +(-12.0, 0) -- +(-12.0, 21.5) -- +(-6.5, 21.5) -- (LCD13_DB6);
+    \draw[wire] (ATMEGA14) -- +(-12.5, 0) -- +(-12.5, 23.0) -- (LCD14_DB7);
+
+    % --- Wires from ATMEGA to LED Display ---
+    \draw[wire] (ATMEGA23) -- +( 9.0, 0) -- +( 9.0, 21) -- (LED_DIN);
+    \draw[wire] (ATMEGA24) -- +( 9.5, 0) -- +( 9.5, 19) -- (LED_CS);
+    \draw[wire] (ATMEGA25) -- +(10.0, 0) -- +(10.0, 17) -- (LED_CLK);
+
+    % --- wires from ATMEGA to PROG Connector
+    \draw[wire] (ATMEGA19) -- +(5.5, 0) -- +(5.5, -3.5) -- (PROG_3);
+    \draw[wire] (ATMEGA18) -- +(4.5, 0) -- +(4.5, -2.5) -- (PROG_1);
+    \draw[wire] (ATMEGA17) -- +(5, 0) -- (PROG_4);
+    \draw[wire] (ATMEGA1) -- +(-1, 0) -- +(-1, 1.5) -- +(10.5, 1.5) -- +(10.5, -12) -- (PROG_5);
+
+    % --- wires from ATMEGA to DCF77
+    \draw[wire] (ATMEGA28) -- +(13, 0) -- (DCF_Q);
+
+    % --- wires from 3V3 to DCF77
+    \draw[wire] (SUPPLY_OUT) -- +(0, -2) -- +(2, -2) -- +(2, -12) -- +(0, -12) -- (DCF_VDD);
+
+    %--- different GND ---
+    \node (GND4) [ground, point down] at (10,-2) {};
+    \draw[wire] (PROG_6) -- +(2, 0) -- (GND4);
+
+    \node (GND5) [ground, point down] at (-9, 15) {};
+    \draw[wire] (LCD2_VSS) -- (GND5);
+    \node (GND12) [ground, point down] at (-7, 15) {};
+    \draw[wire] (LCD3_VO) -| (GND12);
+
+    \node (GND6) [ground, point down] at (2+14,0.5+24) {};
+    \draw[wire] (SUPPLY_GND1) -- (GND6);
+    \node (GND7) [ground, point down] at (3+14,0.5+24) {};
+    \draw[wire] (SUPPLY_GND2) -- (GND7);
+
+    \node (GND8) [ground, point down] at (2+14,0.5+14) {};
+    \node (GND9) [ground, point down] at (3+14,0.5+14) {};
+    \draw[wire] (DCF_E) -- (GND8);
+    \draw[wire] (DCF_GND) -- (GND9);
+
+    \node (GND10) [ground, point down] at (-11, 5) {};
+    \draw[wire] (ATMEGA8) -| (GND10);
+
+    \node (GND11) [ground, point down] at (13, 30) {};
+    \draw[wire] (LED_GND) -| (GND11);
+
+    % --- different VDD ---
+    \node (VDD2) [vdd, info=left:{\tiny $V_{DD}$}] at (-9, 15 - 7) {};
+    \draw[wire] (ATMEGA7) -- (VDD2);
+
+    \node (VDD3) [vdd, point down, info={\tiny $V_{DD}$}] at (-8, 14) {};
+    \draw[wire] (LCD1_VDD) -- (VDD3);
+
+    \node (VDD4) [vdd, point down, info={\tiny $V_{DD}$}] at (11, 5+27) {};
+    \draw[wire] (LED_VCC) -- (VDD4);
+
+    \node (VDD5) [vdd, point down, info={\tiny $V_{DD}$}] at (1+14,0.5+23) {};
+    \draw[wire] (SUPPLY_IN) -- (VDD5);
+\end{tikzpicture}
+
+\end{document}
