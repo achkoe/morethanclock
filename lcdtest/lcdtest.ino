@@ -116,7 +116,7 @@ void loop() {
         lcd.setCursor(0, 1);
 
         lcd.print((char*)day_of_week[now.weekday.digit.lo]);
-        lcd.print("., ");
+        lcd.print(". ");
         paddedPrint(now.day);
         lcd.print('-');
         paddedPrint(now.month);

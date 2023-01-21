@@ -1,3 +1,4 @@
+% latexmk -xelatex -quiet -g circuit.tex
 \documentclass[a4paper]{article}
 \usepackage[textwidth=20cm, lmargin=0cm, rmargin=0cm ]{geometry}
 
@@ -209,8 +210,6 @@
 
     \node (GND5) [ground, point down] at (-9, 15) {};
     \draw[wire] (LCD2_VSS) -- (GND5);
-    \node (GND12) [ground, point down] at (-7, 15) {};
-    \draw[wire] (LCD3_VO) -| (GND12);
 
     \node (GND6) [ground, point down] at (2+14,0.5+24) {};
     \draw[wire] (SUPPLY_GND1) -- (GND6);
@@ -235,7 +234,7 @@
     \node (VDD2) [vdd, info=left:{\tiny $V_{\mbox{DD}}$}] at (-9, 15 - 7) {};
     \draw[wire] (ATMEGA7) -- (VDD2);
 
-    \node (VDD3) [vdd, point down, info={\tiny $V_{\mbox{DD}}$}] at (-8, 14) {};
+    \node (VDD3) [vdd, point up, info={\tiny $V_{\mbox{DD}}$}] at (-8, 12) {};
     \draw[wire] (LCD1_VDD) -- (VDD3);
 
     \node (VDD4) [vdd, point down, info={\tiny $V_{\mbox{DD}}$}] at (11, 5+27) {};
@@ -245,12 +244,24 @@
     \draw[wire] (SUPPLY_IN) -- (VDD5);
 
     \node (VDD6) [vdd, point down, info=left:{\tiny $V_{\mbox{DD}}$}] at (11,25) {};
-    \node (SWITCH) [make contact, point down] at (11,20) {};
-    \draw[wire] (SWITCH) -- (VDD6);
-    \draw[wire] (LCD15_A) -| (SWITCH);
+    \node (R3) [resistor,point up] at (11,20) {};
+    \node (R3LABEL) at (7, 26) {\tiny {$R_3 \atop 100\Omega$}};
+    \draw[densely dotted] (R3LABEL.east) -- +(0.5, 0) -- (R3);
+    \draw[wire] (R3) -- (VDD6);
+
+    \draw[wire] (LCD15_A) -| (R3);
 
     \node (VDD7) [vdd, info=left:{\tiny $V_{\mbox{DD}}$}] at (4, -1) {};
     \draw[wire] (PROG_2) -- +(-0.5, -0.5) -- (VDD7);
+
+    \node (R4) [resistor, info'=60:{\tiny {$R_4 \atop 10k\Omega$}}] at (-6.5,14) {};
+    \draw[wire] (LCD3_VO) -| (-7,14.5);
+    \draw[-|](-7,14.5) -- (-6,13.5);
+    \node (GND12) [ground, point down] at (-5, 12) {};
+    \draw[wire] (R4) -- +(-1.5,0);
+    \draw[wire] (R4) -| (GND12);
+    \node (CO4) [contact] at (-8,14) {};
+
 \end{tikzpicture}
 
 \end{document}
