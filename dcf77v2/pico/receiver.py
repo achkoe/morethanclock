@@ -21,20 +21,23 @@ Info   Minute P StundeP Tag    WoT Monat Jahr    P  Datum:         Zeit:        
 LOW  is 0.1s
 HIGH is 0.2s
 """
+from machine import Pin
 import time
-import json
-import RPi.GPIO as GPIO
+# Pin 36: 3V3
+# Pin 38: GND
+# Pin 34: GP28
 
+LED = Pin("LED", Pin.OUT)
+PIN = Pin(28, Pin.IN)
 
-PIN = 17
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(PIN, GPIO.IN)
 
 rlist = []
 
 
 def getpin():
-    return GPIO.input(PIN) ^ 1
+    r = PIN.value() ^ 1
+    LED.value(r)
+    return r
 
 
 def decode(rlist):
@@ -90,48 +93,48 @@ def decode(rlist):
 
 def state_0():
     global rlist
-    ts = time.time()
-    t = time.time()
+    ts = time.ticks_ms()
+    t = time.ticks_ms()
     while True:
         if getpin() != 1:
-            t = time.time()
-        if time.time() - t > 0.9:
+            t = time.ticks_ms()
+        if time.ticks_ms() - t > 900:
             # breaking the loop if pin is 1 for at least 0.9s
             break
-    print("sync", time.time() - ts)
+    print("sync", time.ticks_ms() - ts)
     rlist = []
     return 1
 
 
 def state_1(count):
     global rlist
-    t = time.time()
+    t = time.ticks_ms()
     # coming from state_0 or state_1, thus pin is always 1
     while getpin() != 0:
-        if time.time() - t > 1.0:
+        if time.ticks_ms() - t > 1000:
             # no transition to 0 received for more than 1s
             print("1: go to state_0")
             return 0
     # pin is 0
-    t = time.time()
+    t = time.ticks_ms()
     while getpin() != 1:
-        if time.time() - t > 0.3:
+        if time.ticks_ms() - t > 300:
             # pin is 0 for more than 0.3s, thus going back to state_0
             print("2: go to state_0")
             return 0
     # pin is 1 again
-    t = time.time() - t
-    if t > 0.09 and t < 0.11:
+    t = time.ticks_ms() - t
+    if t > 90 and t < 120:
         # pin was 0 for roundabout 0.1s, thus it is a 0
-        print(f"3: {count:02} - {t:4.2} -> 0")
+        print(f"3: {count:02} - {t:6.1} -> 0")
         rlist.append(0)
-    elif t > 0.19 and t < 0.21:
+    elif t > 190 and t < 220:
         # pin was 0 for roundabout 0.2s, thus it is a 1
-        print(f"3: {count:02} - {t:4.2} -> 1")
+        print(f"3: {count:02} - {t:6.1} -> 1")
         rlist.append(1)
     else:
         # pin was 0 for a longer time, thus go to state_0
-        print("4: go to state_0")
+        print(f"4: {t:6.1} -> go to state_0")
         return 0
     return count + 1
 
@@ -150,18 +153,10 @@ def receive():
             else:
                 print("done")
                 print("".join(str(r) for r in rlist))
-                print(json.dumps(decode(rlist), indent=4))
+                print(decode(rlist))
                 break
 
 
 if __name__ == "__main__":
     print("RECEIVER", 1 ^ 1, 0 ^ 1)
     receive()
-    if 0:
-        s = [int(c) for c in "01110011011000000100100000000000000010010111100001110001000"]
-        s = [int(c) for c in "00000010011100100010101101001010000110000011010001110001000"]
-        print(s)
-        r = decode(s)
-    else:
-        r = decode(rlist)
-    print(json.dumps(r, indent=4))
