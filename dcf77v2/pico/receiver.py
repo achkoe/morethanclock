@@ -34,6 +34,22 @@ PIN = Pin(28, Pin.IN)
 rlist = []
 
 
+c_pin = PIN.value()
+p_pin = c_pin
+tfilter = 0.005
+
+
+def _getpin():
+    global c_pin, p_pin
+    c_pin = PIN.value()
+    if c_pin != p_pin:
+        time.sleep(tfilter)
+        if PIN.value() == c_pin:
+            p_pin = c_pin
+    LED.value(p_pin)
+    return p_pin ^ 1
+
+
 def getpin():
     r = PIN.value() ^ 1
     LED.value(r)
