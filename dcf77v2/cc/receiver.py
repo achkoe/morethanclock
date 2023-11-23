@@ -125,7 +125,7 @@ def state_0():
 def state_1(count):
     global rlist
     t = time.time()
-    # coming from state_0 or state_1, thus pin is always 1
+    # coming from state_0 or state_1, thus pin is always 17
     while getpin() != 0:
         if time.time() - t > 1.000:
             # no transition to 0 received for more than 1s
