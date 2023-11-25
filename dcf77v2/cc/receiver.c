@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <time.h>
 
 
@@ -14,6 +15,10 @@ struct gpiod_line_bulk lines;
 
 #define PIN_IN 14
 #define TFORMAT "%" PRId64 "\n"
+#define LOGLEVEL 10
+#define DEBUG 10
+#define INFO 20
+
 unsigned char recvbuffer[61];
 
 
@@ -134,6 +139,16 @@ void decode() {
     dcf77.year = 2000 + recvbuffer[50] * 1 + recvbuffer[51] * 2 + recvbuffer[52] * 4 + recvbuffer[53] * 8 + recvbuffer[54] * 10 + recvbuffer[55] * 20 + recvbuffer[56] * 40 + recvbuffer[57] * 80;
 }
 
+
+void logfn(int level, const char* format, ...) {
+    va_list args;
+    if (level < LOGLEVEL) return;
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+}
+
+
 void _main() {
     int s;
 
@@ -145,6 +160,10 @@ void _main() {
 #define STATE_1 1
 #define STATE_2 2
 
+
+void dcf77_receive() {
+
+}
 
 void main() {
     int64_t t;
@@ -161,13 +180,13 @@ void main() {
         return;
     }
 
-    printf("START\n");
+    logfn(INFO, "START\n");
     state = STATE_0;
     pstate = STATE_0;
     tstart = ticks_ms();
     t = ticks_ms();
     ppin = getpin();
-    printf("ppin=%i\n", ppin);
+    logfn(INFO, "ppin=%i\n", ppin);
 
     while (1) {
         pin = getpin();
@@ -175,7 +194,7 @@ void main() {
         if (state == STATE_0) {
             // syncing phase
             if (pin != ppin) {
-                printf("[%i -> %i|t=%" PRId64 "\n" , ppin, pin, ticks_ms() - tstart);
+                logfn(INFO, "[%i -> %i|t=%" PRId64 "\n" , ppin, pin, ticks_ms() - tstart);
                 fflush(stdout);
                 tstart = tcurrent;
                 ppin = pin;
@@ -185,7 +204,7 @@ void main() {
             }
             if ((tcurrent - t) > 1000) {
                 // breaking the loop if pin is 1 for at least 0.9s
-                printf("[pin=%i|ppin=%i|dt=%" PRId64 ": STATE_0 -> STATE_1\n" , pin, ppin, tcurrent - t);
+                logfn(INFO, "[pin=%i|ppin=%i|dt=%" PRId64 ": STATE_0 -> STATE_1\n" , pin, ppin, tcurrent - t);
                 t = tcurrent;
                 count = 0;
                 state = STATE_1;
@@ -195,12 +214,12 @@ void main() {
             // coming from STATE_0 or STATE_2, thus pin is always 1
             if (pin == 1) {
                 if (tcurrent - t > 1000) {
-                    printf("1: STATE_1 -> STATE_0\n");
+                    logfn(INFO, "1: STATE_1 -> STATE_0\n");
                     t = tcurrent;
                     state = STATE_0;
                 }
             } else {
-                printf("2: STATE_1 -> STATE_2\n");
+                logfn(INFO, "2: STATE_1 -> STATE_2\n");
                 t = tcurrent;
                 state = STATE_2;
             }
@@ -210,7 +229,7 @@ void main() {
             if (pin == 0) {
                 if (tcurrent - t > 300) {
                     // pin is 0 for more than 0.3s, thus going back to state_0
-                    printf("3: STATE_1 -> STATE_0\n");
+                    logfn(INFO, "3: STATE_1 -> STATE_0\n");
                     t = tcurrent;
                     state = STATE_0;
                 }
@@ -221,20 +240,20 @@ void main() {
                     // pin is 0 for 90ms ... 120ms -> 0
                     recvbuffer[count] = 0;
                     count += 1;
-                    printf("count=%i, dt=%" PRId64 "-> 0\n", count, tdiff);
+                    logfn(INFO, "count=%i, dt=%" PRId64 "-> 0\n", count, tdiff);
                     t = tcurrent;
                     state = STATE_1;
                 } else if (tdiff > 190 && tdiff < 220) {
                     // pin is 0 for 190ms ... 220ms -> 1
                     recvbuffer[count] = 1;
                     count += 1;
-                    printf("count=%i, dt=%" PRId64 "-> 1\n", count, tdiff);
+                    logfn(INFO, "count=%i, dt=%" PRId64 "-> 1\n", count, tdiff);
                     t = tcurrent;
                     state = STATE_1;
                 } else {
                     // pin is 0 for a longer time, thus go to state_0
                     count = 0;
-                    printf("4: dt=%" PRId64 ": STATE_1 -> STATE_0\n", tdiff);
+                    logfn(INFO, "4: dt=%" PRId64 ": STATE_1 -> STATE_0\n", tdiff);
                     t = tcurrent;
                     state = STATE_0;
                 }
@@ -242,24 +261,24 @@ void main() {
         }
 
         if (count >= 59) {
-            printf("received complete, count=%i: STATE_%i -> STATE_0\n", count, state);
+            logfn(INFO, "received complete, count=%i: STATE_%i -> STATE_0\n", count, state);
             for (count = 0; count < 59; count++) {
-                printf("%c", recvbuffer[count] ? '1': '0');
+                logfn(INFO, "%c", recvbuffer[count] ? '1': '0');
             }
-            printf("\n");
+            logfn(INFO, "\n");
             decode();
-            printf("hour=%d\n", dcf77.hour);
-            printf("minute=%d\n", dcf77.minute);
-            printf("day_of_month=%d\n", dcf77.day_of_month);
-            printf("month=%d\n", dcf77.month);
-            printf("year=%d\n", dcf77.year);
-            printf("day_of_week=%d\n", dcf77.day_of_week);
-            printf("hour_valid=%d\n", dcf77.hour_valid);
-            printf("minute_valid=%d\n", dcf77.minute_valid);
-            printf("date_valid=%d\n", dcf77.date_valid);
-            printf("mesz=%d\n", dcf77.mesz);
-            printf("mez_mesz_anounce=%d\n", dcf77.mez_mesz_anounce);
-            printf("leapsecond_anounce=%d\n", dcf77.leapsecond_anounce);
+            logfn(INFO, "hour=%d\n", dcf77.hour);
+            logfn(INFO, "minute=%d\n", dcf77.minute);
+            logfn(INFO, "day_of_month=%d\n", dcf77.day_of_month);
+            logfn(INFO, "month=%d\n", dcf77.month);
+            logfn(INFO, "year=%d\n", dcf77.year);
+            logfn(INFO, "day_of_week=%d\n", dcf77.day_of_week);
+            logfn(INFO, "hour_valid=%d\n", dcf77.hour_valid);
+            logfn(INFO, "minute_valid=%d\n", dcf77.minute_valid);
+            logfn(INFO, "date_valid=%d\n", dcf77.date_valid);
+            logfn(INFO, "mesz=%d\n", dcf77.mesz);
+            logfn(INFO, "mez_mesz_anounce=%d\n", dcf77.mez_mesz_anounce);
+            logfn(INFO, "leapsecond_anounce=%d\n", dcf77.leapsecond_anounce);
             count = 0;
             state = STATE_0;
         }
