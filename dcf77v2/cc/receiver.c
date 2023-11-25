@@ -15,9 +15,9 @@ struct gpiod_line_bulk lines;
 
 #define PIN_IN 14
 #define TFORMAT "%" PRId64 "\n"
-#define LOGLEVEL 10
 #define DEBUG 10
 #define INFO 20
+#define LOGLEVEL INFO
 
 
 typedef struct {
@@ -172,15 +172,104 @@ void _main() {
 
 
 void dcf77_receive() {
-
-}
-
-void main() {
     int64_t tcurrent;
     int64_t tdiff;
     int pin;
 
+    pin = getpin();
+    tcurrent = ticks_ms();
+    if (receive_s.state == STATE_0) {
+        // syncing phase
+        if (pin != receive_s.ppin) {
+            logfn(DEBUG, "%i -> %i|t=%" PRId64 "\n" , receive_s.ppin, pin, ticks_ms() - receive_s.tstart);
+            fflush(stdout);
+            receive_s.tstart = tcurrent;
+            receive_s.ppin = pin;
+        }
+        if (pin != 1) {
+            receive_s.t = tcurrent;
+        }
+        if ((tcurrent - receive_s.t) > 1000) {
+            // breaking the loop if pin is 1 for at least 0.9s
+            logfn(DEBUG, "[pin=%i|ppin=%i|dt=%" PRId64 ": STATE_0 -> STATE_1\n" , pin, receive_s.ppin, tcurrent - receive_s.t);
+            receive_s.t = tcurrent;
+            receive_s.count = 0;
+            receive_s.state = STATE_1;
+        }
+    }
+    else if (receive_s.state == STATE_1) {
+        // coming from STATE_0 or STATE_2, thus pin is always 1
+        if (pin == 1) {
+            if (tcurrent - receive_s.t > 1000) {
+                logfn(DEBUG, "1: STATE_1 -> STATE_0\n");
+                receive_s.t = tcurrent;
+                receive_s.state = STATE_0;
+            }
+        } else {
+            logfn(DEBUG, "2: STATE_1 -> STATE_2\n");
+            receive_s.t = tcurrent;
+            receive_s.state = STATE_2;
+        }
+    }
+    else if (receive_s.state == STATE_2) {
+        // coming from STATE_1, thus pin is 0
+        if (pin == 0) {
+            if (tcurrent - receive_s.t > 300) {
+                // pin is 0 for more than 0.3s, thus going back to state_0
+                logfn(DEBUG, "3: STATE_1 -> STATE_0\n");
+                receive_s.t = tcurrent;
+                receive_s.state = STATE_0;
+            }
+        } else {
+            // pin is 1 again
+            tdiff = tcurrent - receive_s.t;
+            if (tdiff > 90 && tdiff < 120) {
+                // pin is 0 for 90ms ... 120ms -> 0
+                receive_s.recvbuffer[receive_s.count] = 0;
+                receive_s.count += 1;
+                logfn(DEBUG, "count=%i, dt=%" PRId64 "-> 0\n", receive_s.count, tdiff);
+                receive_s.t = tcurrent;
+                receive_s.state = STATE_1;
+            } else if (tdiff > 190 && tdiff < 220) {
+                // pin is 0 for 190ms ... 220ms -> 1
+                receive_s.recvbuffer[receive_s.count] = 1;
+                receive_s.count += 1;
+                logfn(DEBUG, "count=%i, dt=%" PRId64 "-> 1\n", receive_s.count, tdiff);
+                receive_s.t = tcurrent;
+                receive_s.state = STATE_1;
+            } else {
+                // pin is 0 for a longer time, thus go to state_0
+                receive_s.count = 0;
+                logfn(DEBUG, "4: dt=%" PRId64 ": STATE_1 -> STATE_0\n", tdiff);
+                receive_s.t = tcurrent;
+                receive_s.state = STATE_0;
+            }
+        }
+    }
+}
 
+
+void dcf77_show_frame() {
+    logfn(INFO, "received complete, count=%i: STATE_%i -> STATE_0\n", receive_s.count, receive_s.state);
+    for (receive_s.count = 0; receive_s.count < 59; receive_s.count++) {
+        logfn(INFO, "%c", receive_s.recvbuffer[receive_s.count] ? '1': '0');
+    }
+    logfn(INFO, "\n");
+    logfn(INFO, "hour=%d\n", dcf77.hour);
+    logfn(INFO, "minute=%d\n", dcf77.minute);
+    logfn(INFO, "day_of_month=%d\n", dcf77.day_of_month);
+    logfn(INFO, "month=%d\n", dcf77.month);
+    logfn(INFO, "year=%d\n", dcf77.year);
+    logfn(INFO, "day_of_week=%d\n", dcf77.day_of_week);
+    logfn(INFO, "hour_valid=%d\n", dcf77.hour_valid);
+    logfn(INFO, "minute_valid=%d\n", dcf77.minute_valid);
+    logfn(INFO, "date_valid=%d\n", dcf77.date_valid);
+    logfn(INFO, "mesz=%d\n", dcf77.mesz);
+    logfn(INFO, "mez_mesz_anounce=%d\n", dcf77.mez_mesz_anounce);
+    logfn(INFO, "leapsecond_anounce=%d\n", dcf77.leapsecond_anounce);
+}
+
+void main() {
     if (initialise() != 0) {
         return;
     }
@@ -197,99 +286,16 @@ void main() {
     logfn(INFO, "ppin=%i\n", receive_s.ppin);
 
     while (1) {
-        pin = getpin();
-        tcurrent = ticks_ms();
-        if (receive_s.state == STATE_0) {
-            // syncing phase
-            if (pin != receive_s.ppin) {
-                logfn(INFO, "%i -> %i|t=%" PRId64 "\n" , receive_s.ppin, pin, ticks_ms() - receive_s.tstart);
-                fflush(stdout);
-                receive_s.tstart = tcurrent;
-                receive_s.ppin = pin;
-            }
-            if (pin != 1) {
-                receive_s.t = tcurrent;
-            }
-            if ((tcurrent - receive_s.t) > 1000) {
-                // breaking the loop if pin is 1 for at least 0.9s
-                logfn(INFO, "[pin=%i|ppin=%i|dt=%" PRId64 ": STATE_0 -> STATE_1\n" , pin, receive_s.ppin, tcurrent - receive_s.t);
-                receive_s.t = tcurrent;
-                receive_s.count = 0;
-                receive_s.state = STATE_1;
-            }
-        }
-        else if (receive_s.state == STATE_1) {
-            // coming from STATE_0 or STATE_2, thus pin is always 1
-            if (pin == 1) {
-                if (tcurrent - receive_s.t > 1000) {
-                    logfn(INFO, "1: STATE_1 -> STATE_0\n");
-                    receive_s.t = tcurrent;
-                    receive_s.state = STATE_0;
-                }
-            } else {
-                logfn(INFO, "2: STATE_1 -> STATE_2\n");
-                receive_s.t = tcurrent;
-                receive_s.state = STATE_2;
-            }
-        }
-        else if (receive_s.state == STATE_2) {
-            // coming from STATE_1, thus pin is 0
-            if (pin == 0) {
-                if (tcurrent - receive_s.t > 300) {
-                    // pin is 0 for more than 0.3s, thus going back to state_0
-                    logfn(INFO, "3: STATE_1 -> STATE_0\n");
-                    receive_s.t = tcurrent;
-                    receive_s.state = STATE_0;
-                }
-            } else {
-                // pin is 1 again
-                tdiff = tcurrent - receive_s.t;
-                if (tdiff > 90 && tdiff < 120) {
-                    // pin is 0 for 90ms ... 120ms -> 0
-                    receive_s.recvbuffer[receive_s.count] = 0;
-                    receive_s.count += 1;
-                    logfn(INFO, "count=%i, dt=%" PRId64 "-> 0\n", receive_s.count, tdiff);
-                    receive_s.t = tcurrent;
-                    receive_s.state = STATE_1;
-                } else if (tdiff > 190 && tdiff < 220) {
-                    // pin is 0 for 190ms ... 220ms -> 1
-                    receive_s.recvbuffer[receive_s.count] = 1;
-                    receive_s.count += 1;
-                    logfn(INFO, "count=%i, dt=%" PRId64 "-> 1\n", receive_s.count, tdiff);
-                    receive_s.t = tcurrent;
-                    receive_s.state = STATE_1;
-                } else {
-                    // pin is 0 for a longer time, thus go to state_0
-                    receive_s.count = 0;
-                    logfn(INFO, "4: dt=%" PRId64 ": STATE_1 -> STATE_0\n", tdiff);
-                    receive_s.t = tcurrent;
-                    receive_s.state = STATE_0;
-                }
-            }
-        }
+        dcf77_receive();
 
         if (receive_s.count >= 59) {
-            logfn(INFO, "received complete, count=%i: STATE_%i -> STATE_0\n", receive_s.count, receive_s.state);
-            for (receive_s.count = 0; receive_s.count < 59; receive_s.count++) {
-                logfn(INFO, "%c", receive_s.recvbuffer[receive_s.count] ? '1': '0');
-            }
-            logfn(INFO, "\n");
             decode();
-            logfn(INFO, "hour=%d\n", dcf77.hour);
-            logfn(INFO, "minute=%d\n", dcf77.minute);
-            logfn(INFO, "day_of_month=%d\n", dcf77.day_of_month);
-            logfn(INFO, "month=%d\n", dcf77.month);
-            logfn(INFO, "year=%d\n", dcf77.year);
-            logfn(INFO, "day_of_week=%d\n", dcf77.day_of_week);
-            logfn(INFO, "hour_valid=%d\n", dcf77.hour_valid);
-            logfn(INFO, "minute_valid=%d\n", dcf77.minute_valid);
-            logfn(INFO, "date_valid=%d\n", dcf77.date_valid);
-            logfn(INFO, "mesz=%d\n", dcf77.mesz);
-            logfn(INFO, "mez_mesz_anounce=%d\n", dcf77.mez_mesz_anounce);
-            logfn(INFO, "leapsecond_anounce=%d\n", dcf77.leapsecond_anounce);
+            dcf77_show_frame();
             receive_s.count = 0;
             receive_s.state = STATE_0;
         }
+
+
     }
 }
 
