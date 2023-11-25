@@ -21,26 +21,26 @@ struct gpiod_line_bulk lines;
 
 
 typedef struct {
-    unsigned int mesz;
-    unsigned int mez_mesz_anounce;
-    unsigned int leapsecond_anounce;
-    unsigned int minute;
-    unsigned int minute_valid;
-    unsigned int hour;
-    unsigned int hour_valid;
-    unsigned int day_of_month;
-    unsigned int day_of_week;
-    unsigned int month;
+    unsigned char mesz;
+    unsigned char mez_mesz_anounce;
+    unsigned char leapsecond_anounce;
+    unsigned char minute;
+    unsigned char minute_valid;
+    unsigned char hour;
+    unsigned char hour_valid;
+    unsigned char day_of_month;
+    unsigned char day_of_week;
+    unsigned char month;
     unsigned int year;
-    unsigned int date_valid;
-    unsigned int frame_valid;
+    unsigned char date_valid;
+    unsigned char frame_valid;
 } dcf77_t;
 
 dcf77_t dcf77;
 
 typedef struct {
     unsigned char state;
-    int ppin;
+    char ppin;
     int64_t t;
     int64_t tstart;
     int count;
@@ -49,6 +49,18 @@ typedef struct {
 
 receive_t receive_s;
 
+typedef struct {
+    unsigned char second;
+    unsigned char minute;
+    unsigned char hour;
+    unsigned char day;
+    unsigned char month;
+    unsigned int year;
+    int64_t t;
+    unsigned char update;
+} datetime_t;
+
+datetime_t datetime_s;
 
 int initialise(void) {
     return 0;
@@ -269,6 +281,38 @@ void dcf77_show_frame() {
     logfn(INFO, "leapsecond_anounce=%d\n", dcf77.leapsecond_anounce);
 }
 
+
+void datetime_update() {
+    int64_t tcurrent;
+
+    tcurrent = ticks_ms();
+    if (tcurrent - datetime_s.t >= 1000) {
+        datetime_s.update = 1;
+        datetime_s.t = tcurrent;
+        datetime_s.second += 1;
+        if (datetime_s.second > 59) {
+            datetime_s.second = 0;
+            datetime_s.minute += 1;
+            if (datetime_s.minute > 59) {
+                datetime_s.minute = 0;
+                datetime_s.hour += 1;
+                if (datetime_s.hour > 24) {
+                    datetime_s.hour = 0;
+                }
+            }
+        }
+    }
+}
+
+
+void synchronize() {
+    datetime_s.hour = dcf77.hour;
+    datetime_s.minute = dcf77.minute == 59 ? 0 : dcf77.minute + 1;
+    datetime_s.second = 0;
+    datetime_s.t = ticks_ms();
+    datetime_s.update = 1;
+}
+
 void main() {
     if (initialise() != 0) {
         return;
@@ -291,11 +335,16 @@ void main() {
         if (receive_s.count >= 59) {
             decode();
             dcf77_show_frame();
+            synchronize();
             receive_s.count = 0;
             receive_s.state = STATE_0;
         }
 
-
+        if (datetime_s.update == 1) {
+            datetime_s.update = 0;
+            printf("%02d:%02d:%02d\n", datetime_s.hour, datetime_s.minute, datetime_s.second);
+        }
+        datetime_update();
     }
 }
 
