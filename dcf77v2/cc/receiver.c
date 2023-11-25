@@ -19,8 +19,6 @@ struct gpiod_line_bulk lines;
 #define DEBUG 10
 #define INFO 20
 
-unsigned char recvbuffer[61];
-
 
 typedef struct {
     unsigned int mesz;
@@ -39,6 +37,18 @@ typedef struct {
 } dcf77_t;
 
 dcf77_t dcf77;
+
+typedef struct {
+    unsigned char state;
+    int ppin;
+    int64_t t;
+    int64_t tstart;
+    int count;
+    unsigned char recvbuffer[61];
+} receive_t;
+
+receive_t receive_s;
+
 
 int initialise(void) {
     return 0;
@@ -105,38 +115,38 @@ int64_t ticks_ms() {
 void decode() {
     int index, count;
 
-    if ((recvbuffer[0] != 0) || (recvbuffer[20] != 1)) {
+    if ((receive_s.recvbuffer[0] != 0) || (receive_s.recvbuffer[20] != 1)) {
         dcf77.frame_valid = 0;
         return;
     }
-    dcf77.mesz = (recvbuffer[17] == 1) && (recvbuffer[18] == 0);
-    dcf77.mez_mesz_anounce = recvbuffer[16] == 1;
-    dcf77.leapsecond_anounce = recvbuffer[19] == 1;
+    dcf77.mesz = (receive_s.recvbuffer[17] == 1) && (receive_s.recvbuffer[18] == 0);
+    dcf77.mez_mesz_anounce = receive_s.recvbuffer[16] == 1;
+    dcf77.leapsecond_anounce = receive_s.recvbuffer[19] == 1;
 
     count = 0;
     for (index = 36; index < 58; index++) {
-        count += recvbuffer[index];
+        count += receive_s.recvbuffer[index];
     }
-    dcf77.date_valid = count % 2 == recvbuffer[58];
+    dcf77.date_valid = count % 2 == receive_s.recvbuffer[58];
 
     count = 0;
     for (index = 21; index < 28; index++) {
-        count += recvbuffer[index];
+        count += receive_s.recvbuffer[index];
     }
-    dcf77.minute_valid = count % 2 == recvbuffer[28];
+    dcf77.minute_valid = count % 2 == receive_s.recvbuffer[28];
 
     count = 0;
     for (index = 30; index < 35; index++) {
-        count += recvbuffer[index];
+        count += receive_s.recvbuffer[index];
     }
-    dcf77.hour_valid = count % 2 == recvbuffer[35];
+    dcf77.hour_valid = count % 2 == receive_s.recvbuffer[35];
 
-    dcf77.minute = recvbuffer[21] * 1 + recvbuffer[22] * 2 + recvbuffer[23] * 4 + recvbuffer[24] * 8 + recvbuffer[25] * 10 + recvbuffer[26] * 20 + recvbuffer[27] * 40;
-    dcf77.hour = recvbuffer[29] * 1 + recvbuffer[30] * 2 + recvbuffer[31] * 4 + recvbuffer[32] * 8 + recvbuffer[33] * 10 + recvbuffer[34] * 20;
-    dcf77.day_of_month = recvbuffer[36] * 1 + recvbuffer[37] * 2 + recvbuffer[38] * 4 + recvbuffer[39] * 8 + recvbuffer[40] * 10 + recvbuffer[41] * 20;
-    dcf77.day_of_week = recvbuffer[42] * 1 + recvbuffer[43] * 2 + recvbuffer[44] * 4;
-    dcf77.month = recvbuffer[45] * 1 + recvbuffer[46] * 2 + recvbuffer[47] * 4 + recvbuffer[48] * 8 + recvbuffer[49] * 10;
-    dcf77.year = 2000 + recvbuffer[50] * 1 + recvbuffer[51] * 2 + recvbuffer[52] * 4 + recvbuffer[53] * 8 + recvbuffer[54] * 10 + recvbuffer[55] * 20 + recvbuffer[56] * 40 + recvbuffer[57] * 80;
+    dcf77.minute = receive_s.recvbuffer[21] * 1 + receive_s.recvbuffer[22] * 2 + receive_s.recvbuffer[23] * 4 + receive_s.recvbuffer[24] * 8 + receive_s.recvbuffer[25] * 10 + receive_s.recvbuffer[26] * 20 + receive_s.recvbuffer[27] * 40;
+    dcf77.hour = receive_s.recvbuffer[29] * 1 + receive_s.recvbuffer[30] * 2 + receive_s.recvbuffer[31] * 4 + receive_s.recvbuffer[32] * 8 + receive_s.recvbuffer[33] * 10 + receive_s.recvbuffer[34] * 20;
+    dcf77.day_of_month = receive_s.recvbuffer[36] * 1 + receive_s.recvbuffer[37] * 2 + receive_s.recvbuffer[38] * 4 + receive_s.recvbuffer[39] * 8 + receive_s.recvbuffer[40] * 10 + receive_s.recvbuffer[41] * 20;
+    dcf77.day_of_week = receive_s.recvbuffer[42] * 1 + receive_s.recvbuffer[43] * 2 + receive_s.recvbuffer[44] * 4;
+    dcf77.month = receive_s.recvbuffer[45] * 1 + receive_s.recvbuffer[46] * 2 + receive_s.recvbuffer[47] * 4 + receive_s.recvbuffer[48] * 8 + receive_s.recvbuffer[49] * 10;
+    dcf77.year = 2000 + receive_s.recvbuffer[50] * 1 + receive_s.recvbuffer[51] * 2 + receive_s.recvbuffer[52] * 4 + receive_s.recvbuffer[53] * 8 + receive_s.recvbuffer[54] * 10 + receive_s.recvbuffer[55] * 20 + receive_s.recvbuffer[56] * 40 + receive_s.recvbuffer[57] * 80;
 }
 
 
@@ -166,104 +176,102 @@ void dcf77_receive() {
 }
 
 void main() {
-    int64_t t;
     int64_t tcurrent;
-    int64_t tstart;
     int64_t tdiff;
-    unsigned char state, pstate;
     int pin;
-    int ppin;
-    int count = 0;
-    recvbuffer[60] = 0;
+
 
     if (initialise() != 0) {
         return;
     }
 
     logfn(INFO, "START\n");
-    state = STATE_0;
-    pstate = STATE_0;
-    tstart = ticks_ms();
-    t = ticks_ms();
-    ppin = getpin();
-    logfn(INFO, "ppin=%i\n", ppin);
+
+    receive_s.count = 0;
+    receive_s.recvbuffer[60] = 0;
+    receive_s.state = STATE_0;
+    receive_s.ppin = getpin();
+    receive_s.tstart = ticks_ms();
+    receive_s.t = ticks_ms();
+
+    logfn(INFO, "ppin=%i\n", receive_s.ppin);
 
     while (1) {
         pin = getpin();
         tcurrent = ticks_ms();
-        if (state == STATE_0) {
+        if (receive_s.state == STATE_0) {
             // syncing phase
-            if (pin != ppin) {
-                logfn(INFO, "[%i -> %i|t=%" PRId64 "\n" , ppin, pin, ticks_ms() - tstart);
+            if (pin != receive_s.ppin) {
+                logfn(INFO, "%i -> %i|t=%" PRId64 "\n" , receive_s.ppin, pin, ticks_ms() - receive_s.tstart);
                 fflush(stdout);
-                tstart = tcurrent;
-                ppin = pin;
+                receive_s.tstart = tcurrent;
+                receive_s.ppin = pin;
             }
             if (pin != 1) {
-                t = tcurrent;
+                receive_s.t = tcurrent;
             }
-            if ((tcurrent - t) > 1000) {
+            if ((tcurrent - receive_s.t) > 1000) {
                 // breaking the loop if pin is 1 for at least 0.9s
-                logfn(INFO, "[pin=%i|ppin=%i|dt=%" PRId64 ": STATE_0 -> STATE_1\n" , pin, ppin, tcurrent - t);
-                t = tcurrent;
-                count = 0;
-                state = STATE_1;
+                logfn(INFO, "[pin=%i|ppin=%i|dt=%" PRId64 ": STATE_0 -> STATE_1\n" , pin, receive_s.ppin, tcurrent - receive_s.t);
+                receive_s.t = tcurrent;
+                receive_s.count = 0;
+                receive_s.state = STATE_1;
             }
         }
-        else if (state == STATE_1) {
+        else if (receive_s.state == STATE_1) {
             // coming from STATE_0 or STATE_2, thus pin is always 1
             if (pin == 1) {
-                if (tcurrent - t > 1000) {
+                if (tcurrent - receive_s.t > 1000) {
                     logfn(INFO, "1: STATE_1 -> STATE_0\n");
-                    t = tcurrent;
-                    state = STATE_0;
+                    receive_s.t = tcurrent;
+                    receive_s.state = STATE_0;
                 }
             } else {
                 logfn(INFO, "2: STATE_1 -> STATE_2\n");
-                t = tcurrent;
-                state = STATE_2;
+                receive_s.t = tcurrent;
+                receive_s.state = STATE_2;
             }
         }
-        else if (state == STATE_2) {
+        else if (receive_s.state == STATE_2) {
             // coming from STATE_1, thus pin is 0
             if (pin == 0) {
-                if (tcurrent - t > 300) {
+                if (tcurrent - receive_s.t > 300) {
                     // pin is 0 for more than 0.3s, thus going back to state_0
                     logfn(INFO, "3: STATE_1 -> STATE_0\n");
-                    t = tcurrent;
-                    state = STATE_0;
+                    receive_s.t = tcurrent;
+                    receive_s.state = STATE_0;
                 }
             } else {
                 // pin is 1 again
-                tdiff = tcurrent - t;
+                tdiff = tcurrent - receive_s.t;
                 if (tdiff > 90 && tdiff < 120) {
                     // pin is 0 for 90ms ... 120ms -> 0
-                    recvbuffer[count] = 0;
-                    count += 1;
-                    logfn(INFO, "count=%i, dt=%" PRId64 "-> 0\n", count, tdiff);
-                    t = tcurrent;
-                    state = STATE_1;
+                    receive_s.recvbuffer[receive_s.count] = 0;
+                    receive_s.count += 1;
+                    logfn(INFO, "count=%i, dt=%" PRId64 "-> 0\n", receive_s.count, tdiff);
+                    receive_s.t = tcurrent;
+                    receive_s.state = STATE_1;
                 } else if (tdiff > 190 && tdiff < 220) {
                     // pin is 0 for 190ms ... 220ms -> 1
-                    recvbuffer[count] = 1;
-                    count += 1;
-                    logfn(INFO, "count=%i, dt=%" PRId64 "-> 1\n", count, tdiff);
-                    t = tcurrent;
-                    state = STATE_1;
+                    receive_s.recvbuffer[receive_s.count] = 1;
+                    receive_s.count += 1;
+                    logfn(INFO, "count=%i, dt=%" PRId64 "-> 1\n", receive_s.count, tdiff);
+                    receive_s.t = tcurrent;
+                    receive_s.state = STATE_1;
                 } else {
                     // pin is 0 for a longer time, thus go to state_0
-                    count = 0;
+                    receive_s.count = 0;
                     logfn(INFO, "4: dt=%" PRId64 ": STATE_1 -> STATE_0\n", tdiff);
-                    t = tcurrent;
-                    state = STATE_0;
+                    receive_s.t = tcurrent;
+                    receive_s.state = STATE_0;
                 }
             }
         }
 
-        if (count >= 59) {
-            logfn(INFO, "received complete, count=%i: STATE_%i -> STATE_0\n", count, state);
-            for (count = 0; count < 59; count++) {
-                logfn(INFO, "%c", recvbuffer[count] ? '1': '0');
+        if (receive_s.count >= 59) {
+            logfn(INFO, "received complete, count=%i: STATE_%i -> STATE_0\n", receive_s.count, receive_s.state);
+            for (receive_s.count = 0; receive_s.count < 59; receive_s.count++) {
+                logfn(INFO, "%c", receive_s.recvbuffer[receive_s.count] ? '1': '0');
             }
             logfn(INFO, "\n");
             decode();
@@ -279,8 +287,8 @@ void main() {
             logfn(INFO, "mesz=%d\n", dcf77.mesz);
             logfn(INFO, "mez_mesz_anounce=%d\n", dcf77.mez_mesz_anounce);
             logfn(INFO, "leapsecond_anounce=%d\n", dcf77.leapsecond_anounce);
-            count = 0;
-            state = STATE_0;
+            receive_s.count = 0;
+            receive_s.state = STATE_0;
         }
     }
 }
