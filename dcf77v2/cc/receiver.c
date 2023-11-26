@@ -57,10 +57,13 @@ typedef struct {
     unsigned char month;
     unsigned int year;
     int64_t t;
+    int64_t time;
     unsigned char update;
 } datetime_t;
 
 datetime_t datetime_s;
+
+tm tm_s;
 
 int initialise(void) {
     return 0;
@@ -289,6 +292,8 @@ void datetime_update() {
     if (tcurrent - datetime_s.t >= 1000) {
         datetime_s.update = 1;
         datetime_s.t = tcurrent;
+        datetime_s.time += 1;
+
         datetime_s.second += 1;
         if (datetime_s.second > 59) {
             datetime_s.second = 0;
@@ -342,7 +347,8 @@ void main() {
 
         if (datetime_s.update == 1) {
             datetime_s.update = 0;
-            printf("%02d:%02d:%02d\n", datetime_s.hour, datetime_s.minute, datetime_s.second);
+            //printf("%02d:%02d:%02d\n", datetime_s.hour, datetime_s.minute, datetime_s.second);
+            tm_s = localtime(&datetime_s.time);
         }
         datetime_update();
     }
