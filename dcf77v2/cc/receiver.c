@@ -302,6 +302,7 @@ void synchronize() {
         tm.tm_min = dcf77.minute == 59 ? 0 : dcf77.minute + 1;
     }
     tm.tm_sec = 0;
+    tm.tm_isdst = dcf77.mesz;
     if (dcf77.date_valid == 1) {
         tm.tm_mon = dcf77.month - 1;
         tm.tm_year = dcf77.year - 1900;
