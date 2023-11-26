@@ -13,8 +13,15 @@ struct gpiod_chip *chip;
 struct gpiod_line_request_config config;
 struct gpiod_line_bulk lines;
 
+// DCF77 input pin
 #define PIN_IN 14
-#define TFORMAT "%" PRId64 "\n"
+
+// the states of DCF77 receiver
+#define STATE_0 0
+#define STATE_1 1
+#define STATE_2 2
+
+// Log levels
 #define DEBUG 10
 #define INFO 20
 #define LOGLEVEL INFO
@@ -50,24 +57,29 @@ typedef struct {
 receive_t receive_s;
 
 typedef struct {
-    unsigned char second;
-    unsigned char minute;
-    unsigned char hour;
-    unsigned char day;
-    unsigned char month;
-    unsigned int year;
     int64_t t;
-    int64_t time;
+    time_t localtime;
     unsigned char update;
-} datetime_t;
+} localtime_t;
 
-datetime_t datetime_s;
+localtime_t localtime_s;
 
-tm tm_s;
+struct tm tm;
+
+
+void logfn(int level, const char* format, ...) {
+    va_list args;
+    if (level < LOGLEVEL) return;
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+}
+
 
 int initialise(void) {
     return 0;
 }
+
 
 int getpin() {
     unsigned int offsets[1];
@@ -118,6 +130,7 @@ int getpin() {
     //return values[0] ^ 1;
 }
 
+
 int64_t ticks_ms() {
     struct timespec now;
     timespec_get(&now, TIME_UTC);
@@ -165,27 +178,6 @@ void decode() {
 }
 
 
-void logfn(int level, const char* format, ...) {
-    va_list args;
-    if (level < LOGLEVEL) return;
-    va_start(args, format);
-    vprintf(format, args);
-    va_end(args);
-}
-
-
-void _main() {
-    int s;
-
-    s = getpin();
-    printf("%i\n", s);
-}
-
-#define STATE_0 0
-#define STATE_1 1
-#define STATE_2 2
-
-
 void dcf77_receive() {
     int64_t tcurrent;
     int64_t tdiff;
@@ -206,7 +198,7 @@ void dcf77_receive() {
         }
         if ((tcurrent - receive_s.t) > 1000) {
             // breaking the loop if pin is 1 for at least 0.9s
-            logfn(DEBUG, "[pin=%i|ppin=%i|dt=%" PRId64 ": STATE_0 -> STATE_1\n" , pin, receive_s.ppin, tcurrent - receive_s.t);
+            logfn(INFO, "[pin=%i|ppin=%i|dt=%" PRId64 ": STATE_0 -> STATE_1\n" , pin, receive_s.ppin, tcurrent - receive_s.t);
             receive_s.t = tcurrent;
             receive_s.count = 0;
             receive_s.state = STATE_1;
@@ -285,38 +277,41 @@ void dcf77_show_frame() {
 }
 
 
-void datetime_update() {
+/** Advance localtime py 1 if 1s has elapsed.
+ */
+void localtime_update() {
     int64_t tcurrent;
 
     tcurrent = ticks_ms();
-    if (tcurrent - datetime_s.t >= 1000) {
-        datetime_s.update = 1;
-        datetime_s.t = tcurrent;
-        datetime_s.time += 1;
-
-        datetime_s.second += 1;
-        if (datetime_s.second > 59) {
-            datetime_s.second = 0;
-            datetime_s.minute += 1;
-            if (datetime_s.minute > 59) {
-                datetime_s.minute = 0;
-                datetime_s.hour += 1;
-                if (datetime_s.hour > 24) {
-                    datetime_s.hour = 0;
-                }
-            }
-        }
+    if (tcurrent - localtime_s.t >= 1000) {
+        localtime_s.update = 1;
+        localtime_s.t = tcurrent;
+        localtime_s.localtime += 1;
     }
 }
 
 
+/** Synchronize local time with time received from DCF77.
+*/
 void synchronize() {
-    datetime_s.hour = dcf77.hour;
-    datetime_s.minute = dcf77.minute == 59 ? 0 : dcf77.minute + 1;
-    datetime_s.second = 0;
-    datetime_s.t = ticks_ms();
-    datetime_s.update = 1;
+    tm = *localtime(&localtime_s.localtime);
+    if (dcf77.hour_valid == 1) {
+        tm.tm_hour = dcf77.hour;
+    }
+    if (dcf77.minute_valid == 1) {
+        tm.tm_min = dcf77.minute == 59 ? 0 : dcf77.minute + 1;
+    }
+    tm.tm_sec = 0;
+    if (dcf77.date_valid == 1) {
+        tm.tm_mon = dcf77.month - 1;
+        tm.tm_year = dcf77.year - 1900;
+        tm.tm_mday = dcf77.day_of_month;
+    }
+    localtime_s.localtime = mktime(&tm);
+    localtime_s.t = ticks_ms();
+    localtime_s.update = 1;
 }
+
 
 void main() {
     if (initialise() != 0) {
@@ -332,6 +327,8 @@ void main() {
     receive_s.tstart = ticks_ms();
     receive_s.t = ticks_ms();
 
+    localtime_s.localtime = 0;
+
     logfn(INFO, "ppin=%i\n", receive_s.ppin);
 
     while (1) {
@@ -345,12 +342,12 @@ void main() {
             receive_s.state = STATE_0;
         }
 
-        if (datetime_s.update == 1) {
-            datetime_s.update = 0;
-            //printf("%02d:%02d:%02d\n", datetime_s.hour, datetime_s.minute, datetime_s.second);
-            tm_s = localtime(&datetime_s.time);
+        if (localtime_s.update == 1) {
+            localtime_s.update = 0;
+            tm = *localtime(&localtime_s.localtime);
+            printf("%s", asctime(&tm));
         }
-        datetime_update();
+        localtime_update();
     }
 }
 
