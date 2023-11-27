@@ -1,20 +1,19 @@
-#include <gpiod.h>
-#include <error.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <inttypes.h>
-#include <stdio.h>
+/*
+export PICO_SDK_PATH=~/pico/pico-sdk/
+cd build
+make
+cp dcf77.uf2 /media/achimk/RPI-RP2
+
+optional:
+cmake ..
+*/
+
 #include <stdarg.h>
+#include <stdio.h>
+#include "pico/stdlib.h"
+#include "hardware/gpio.h"
 #include <time.h>
 
-
-struct gpiod_chip *chip;
-struct gpiod_line_request_config config;
-struct gpiod_line_bulk lines;
-
-// DCF77 input pin
-#define PIN_IN 14
 
 // the states of DCF77 receiver
 #define STATE_0 0
@@ -26,6 +25,20 @@ struct gpiod_line_bulk lines;
 #define INFO 20
 #define LOGLEVEL INFO
 
+
+const uint LED_PIN = 25;
+const uint PIN_IN = 28;
+
+typedef struct {
+    unsigned char state;
+    char ppin;
+    int64_t t;
+    int64_t tstart;
+    int count;
+    unsigned char recvbuffer[61];
+} receive_t;
+
+receive_t receive_s;
 
 typedef struct {
     unsigned char mesz;
@@ -46,17 +59,6 @@ typedef struct {
 dcf77_t dcf77;
 
 typedef struct {
-    unsigned char state;
-    char ppin;
-    int64_t t;
-    int64_t tstart;
-    int count;
-    unsigned char recvbuffer[61];
-} receive_t;
-
-receive_t receive_s;
-
-typedef struct {
     int64_t t;
     time_t localtime;
     unsigned char update;
@@ -65,6 +67,25 @@ typedef struct {
 localtime_t localtime_s;
 
 struct tm tm;
+
+
+void initialize() {
+    stdio_init_all();
+    gpio_init(LED_PIN);
+    gpio_init(PIN_IN);
+    gpio_set_dir(LED_PIN, GPIO_OUT);
+    gpio_set_dir(PIN_IN, GPIO_IN);
+}
+
+
+int getpin() {
+    return gpio_get(PIN_IN);
+}
+
+
+int64_t ticks_ms() {
+    return  time_us_64() / 1000;
+}
 
 
 void logfn(int level, const char* format, ...) {
@@ -76,68 +97,84 @@ void logfn(int level, const char* format, ...) {
 }
 
 
-int initialise(void) {
-    return 0;
+void dcf77_receive() {
+    int64_t tcurrent;
+    int64_t tdiff;
+    int pin;
+
+    pin = getpin();
+    gpio_put(LED_PIN, pin);
+    tcurrent = ticks_ms();
+    if (receive_s.state == STATE_0) {
+        // syncing phase
+        if (pin != receive_s.ppin) {
+            logfn(DEBUG, "%i -> %i|t=%lld\n" , receive_s.ppin, pin, ticks_ms() - receive_s.tstart);
+            fflush(stdout);
+            receive_s.tstart = tcurrent;
+            receive_s.ppin = pin;
+        }
+        if (pin != 1) {
+            receive_s.t = tcurrent;
+        }
+        if ((tcurrent - receive_s.t) > 1000) {
+            // breaking the loop if pin is 1 for at least 0.9s
+            logfn(INFO, "[pin=%i|ppin=%i|dt=%lld: STATE_0 -> STATE_1\n" , pin, receive_s.ppin, tcurrent - receive_s.t);
+            receive_s.t = tcurrent;
+            receive_s.count = 0;
+            receive_s.state = STATE_1;
+        }
+    }
+    else if (receive_s.state == STATE_1) {
+        // coming from STATE_0 or STATE_2, thus pin is always 1
+        if (pin == 1) {
+            if (tcurrent - receive_s.t > 1000) {
+                logfn(DEBUG, "1: STATE_1 -> STATE_0\n");
+                receive_s.t = tcurrent;
+                receive_s.state = STATE_0;
+            }
+        } else {
+            logfn(DEBUG, "2: STATE_1 -> STATE_2\n");
+            receive_s.t = tcurrent;
+            receive_s.state = STATE_2;
+        }
+    }
+    else if (receive_s.state == STATE_2) {
+        // coming from STATE_1, thus pin is 0
+        if (pin == 0) {
+            if (tcurrent - receive_s.t > 300) {
+                // pin is 0 for more than 0.3s, thus going back to state_0
+                logfn(DEBUG, "3: STATE_1 -> STATE_0\n");
+                receive_s.t = tcurrent;
+                receive_s.state = STATE_0;
+            }
+        } else {
+            // pin is 1 again
+            tdiff = tcurrent - receive_s.t;
+            if (tdiff > 90 && tdiff < 120) {
+                // pin is 0 for 90ms ... 120ms -> 0
+                receive_s.recvbuffer[receive_s.count] = 0;
+                receive_s.count += 1;
+                logfn(DEBUG, "count=%i, dt=%lld-> 0\n", receive_s.count, tdiff);
+                receive_s.t = tcurrent;
+                receive_s.state = STATE_1;
+            } else if (tdiff > 190 && tdiff < 220) {
+                // pin is 0 for 190ms ... 220ms -> 1
+                receive_s.recvbuffer[receive_s.count] = 1;
+                receive_s.count += 1;
+                logfn(DEBUG, "count=%i, dt=%lld-> 1\n", receive_s.count, tdiff);
+                receive_s.t = tcurrent;
+                receive_s.state = STATE_1;
+            } else {
+                // pin is 0 for a longer time, thus go to state_0
+                receive_s.count = 0;
+                logfn(DEBUG, "4: dt=%lld: STATE_1 -> STATE_0\n", tdiff);
+                receive_s.t = tcurrent;
+                receive_s.state = STATE_0;
+            }
+        }
+    }
 }
 
-
-int getpin() {
-    unsigned int offsets[1];
-
-    int values[1];
-    int err;
-
-    chip = gpiod_chip_open("/dev/gpiochip0");
-    if(!chip) {
-        perror("gpiod_chip_open");
-        goto cleanup;
-    }
-
-    // use pin 14 as input
-    offsets[0] = 14;
-    values[0] = -1;
-
-    err = gpiod_chip_get_lines(chip, offsets, 1, &lines);
-    if(err) {
-        perror("gpiod_chip_get_lines");
-        goto cleanup;
-    }
-
-    memset(&config, 0, sizeof(config));
-    config.consumer = "input example";
-    config.request_type = GPIOD_LINE_REQUEST_DIRECTION_INPUT;
-    config.flags = 0;
-
-    err = gpiod_line_request_bulk(&lines, &config, values);
-    if(err) {
-        perror("gpiod_line_request_bulk");
-        goto cleanup;
-    }
-
-    err = gpiod_line_get_value_bulk(&lines, values);
-    if(err) {
-        perror("gpiod_line_get_value_bulk");
-        goto cleanup;
-    }
-
-    // printf("value of gpio line %d=%d\n", offsets[0], values[0]);
-
-    cleanup:
-        gpiod_line_release_bulk(&lines);
-        gpiod_chip_close(chip);
-
-    return values[0];
-    //return values[0] ^ 1;
-}
-
-
-int64_t ticks_ms() {
-    struct timespec now;
-    timespec_get(&now, TIME_UTC);
-    return ((int64_t) now.tv_sec) * 1000 + ((int64_t) now.tv_nsec) / 1000000;
-
-    return 1000.0 * (long double)clock() / CLOCKS_PER_SEC;
-}
 
 /** Decode data in recvbuffer to dcf77 */
 void decode() {
@@ -175,84 +212,6 @@ void decode() {
     dcf77.day_of_week = receive_s.recvbuffer[42] * 1 + receive_s.recvbuffer[43] * 2 + receive_s.recvbuffer[44] * 4;
     dcf77.month = receive_s.recvbuffer[45] * 1 + receive_s.recvbuffer[46] * 2 + receive_s.recvbuffer[47] * 4 + receive_s.recvbuffer[48] * 8 + receive_s.recvbuffer[49] * 10;
     dcf77.year = 2000 + receive_s.recvbuffer[50] * 1 + receive_s.recvbuffer[51] * 2 + receive_s.recvbuffer[52] * 4 + receive_s.recvbuffer[53] * 8 + receive_s.recvbuffer[54] * 10 + receive_s.recvbuffer[55] * 20 + receive_s.recvbuffer[56] * 40 + receive_s.recvbuffer[57] * 80;
-}
-
-
-void dcf77_receive() {
-    int64_t tcurrent;
-    int64_t tdiff;
-    int pin;
-
-    pin = getpin();
-    tcurrent = ticks_ms();
-    if (receive_s.state == STATE_0) {
-        // syncing phase
-        if (pin != receive_s.ppin) {
-            logfn(DEBUG, "%i -> %i|t=%" PRId64 "\n" , receive_s.ppin, pin, ticks_ms() - receive_s.tstart);
-            fflush(stdout);
-            receive_s.tstart = tcurrent;
-            receive_s.ppin = pin;
-        }
-        if (pin != 1) {
-            receive_s.t = tcurrent;
-        }
-        if ((tcurrent - receive_s.t) > 1000) {
-            // breaking the loop if pin is 1 for at least 0.9s
-            logfn(INFO, "[pin=%i|ppin=%i|dt=%" PRId64 ": STATE_0 -> STATE_1\n" , pin, receive_s.ppin, tcurrent - receive_s.t);
-            receive_s.t = tcurrent;
-            receive_s.count = 0;
-            receive_s.state = STATE_1;
-        }
-    }
-    else if (receive_s.state == STATE_1) {
-        // coming from STATE_0 or STATE_2, thus pin is always 1
-        if (pin == 1) {
-            if (tcurrent - receive_s.t > 1000) {
-                logfn(DEBUG, "1: STATE_1 -> STATE_0\n");
-                receive_s.t = tcurrent;
-                receive_s.state = STATE_0;
-            }
-        } else {
-            logfn(DEBUG, "2: STATE_1 -> STATE_2\n");
-            receive_s.t = tcurrent;
-            receive_s.state = STATE_2;
-        }
-    }
-    else if (receive_s.state == STATE_2) {
-        // coming from STATE_1, thus pin is 0
-        if (pin == 0) {
-            if (tcurrent - receive_s.t > 300) {
-                // pin is 0 for more than 0.3s, thus going back to state_0
-                logfn(DEBUG, "3: STATE_1 -> STATE_0\n");
-                receive_s.t = tcurrent;
-                receive_s.state = STATE_0;
-            }
-        } else {
-            // pin is 1 again
-            tdiff = tcurrent - receive_s.t;
-            if (tdiff > 90 && tdiff < 120) {
-                // pin is 0 for 90ms ... 120ms -> 0
-                receive_s.recvbuffer[receive_s.count] = 0;
-                receive_s.count += 1;
-                logfn(DEBUG, "count=%i, dt=%" PRId64 "-> 0\n", receive_s.count, tdiff);
-                receive_s.t = tcurrent;
-                receive_s.state = STATE_1;
-            } else if (tdiff > 190 && tdiff < 220) {
-                // pin is 0 for 190ms ... 220ms -> 1
-                receive_s.recvbuffer[receive_s.count] = 1;
-                receive_s.count += 1;
-                logfn(DEBUG, "count=%i, dt=%" PRId64 "-> 1\n", receive_s.count, tdiff);
-                receive_s.t = tcurrent;
-                receive_s.state = STATE_1;
-            } else {
-                // pin is 0 for a longer time, thus go to state_0
-                receive_s.count = 0;
-                logfn(DEBUG, "4: dt=%" PRId64 ": STATE_1 -> STATE_0\n", tdiff);
-                receive_s.t = tcurrent;
-                receive_s.state = STATE_0;
-            }
-        }
-    }
 }
 
 
@@ -315,11 +274,7 @@ void synchronize() {
 
 
 void main() {
-    if (initialise() != 0) {
-        return;
-    }
-
-    logfn(INFO, "START\n");
+    initialize();
 
     receive_s.count = 0;
     receive_s.recvbuffer[60] = 0;
@@ -330,11 +285,8 @@ void main() {
 
     localtime_s.localtime = 0;
 
-    logfn(INFO, "ppin=%i\n", receive_s.ppin);
-
     while (1) {
         dcf77_receive();
-
         if (receive_s.count >= 59) {
             decode();
             dcf77_show_frame();
@@ -342,7 +294,6 @@ void main() {
             receive_s.count = 0;
             receive_s.state = STATE_0;
         }
-
         if (localtime_s.update == 1) {
             localtime_s.update = 0;
             tm = *localtime(&localtime_s.localtime);
@@ -351,5 +302,3 @@ void main() {
         localtime_update();
     }
 }
-
-
