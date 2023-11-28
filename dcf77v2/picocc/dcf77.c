@@ -78,7 +78,7 @@ void initialize() {
     gpio_set_dir(LED_PIN, GPIO_OUT);
     gpio_set_dir(PIN_IN, GPIO_IN);
     gpio_set_dir(PIN_BUTTON, GPIO_IN);
-    gpio_pull_down(PIN_BUTTON);
+    gpio_pull_up(PIN_BUTTON);
 }
 
 
@@ -407,8 +407,8 @@ void __main() {
 
 
 void main() {
-    unsigned char buttonState = 0;
-    unsigned char lastButtonState = 0;
+    unsigned char buttonState = 1;
+    unsigned char lastButtonState = 1;
     unsigned char reading;
     bool ledState = true;
     int64_t lastDebounceTime = 0;
@@ -431,8 +431,8 @@ void main() {
             if (reading != buttonState) {
                 buttonState = reading;
 
-                // only toggle the LED if the new button state is HIGH
-                if (buttonState == 1) {
+                // only toggle the LED if the new button state is LOW
+                if (buttonState == 0) {
                     ledState = !ledState;
                 }
             }
