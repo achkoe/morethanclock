@@ -28,6 +28,7 @@ cmake ..
 
 const uint LED_PIN = 25;
 const uint PIN_IN = 28;
+const uint PIN_BUTTON = 15;
 
 typedef struct {
     unsigned char state;
@@ -73,8 +74,11 @@ void initialize() {
     stdio_init_all();
     gpio_init(LED_PIN);
     gpio_init(PIN_IN);
+    gpio_init(PIN_BUTTON);
     gpio_set_dir(LED_PIN, GPIO_OUT);
     gpio_set_dir(PIN_IN, GPIO_IN);
+    gpio_set_dir(PIN_BUTTON, GPIO_IN);
+    gpio_pull_down(PIN_BUTTON);
 }
 
 
@@ -273,7 +277,80 @@ void synchronize() {
 }
 
 
-void main() {
+/*
+ *    number  0  1  2  3  4  5  6  7  8  9
+ * segment a  1  0  1  1  0  1  1  1  1  1  GPIO0
+ * segment b  1  1  1  1  1  0  0  1  1  1  GPIO1
+ * segment c  1  1  0  1  1  1  1  1  1  1  GPIO5
+ * segment d  1  0  1  1  0  1  1  0  1  1  GPIO7
+ * segment e  1  0  1  0  0  0  1  0  1  0  GPIO2
+ * segment f  1  0  0  0  1  1  1  0  1  1  GPIO4
+ * segment g  0  0  1  1  1  1  1  0  1  1  GPIO3
+ * dp                                       GPIO6
+*/
+
+unsigned char const segments[11] = {
+// Each value in this array represents the segments for displaying a number
+// in a 7 segment display. The number corresponds to the index in the array.
+// The segments are driven by GPIO as shown in comment.
+// Used by function  gpio_set_mask(uint32_t mask)
+//   -------------------------GPIO------------------------------------
+//  0       1       2       3       4        5        6        7
+    1 * 1 + 1 * 2 + 1 * 4 + 0 * 8 + 1 * 16 + 1 * 32 + 0 * 64 + 1 * 128, // 0
+    0 * 1 + 1 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 1 * 32 + 0 * 64 + 0 * 128, // 1
+    1 * 1 + 1 * 2 + 1 * 4 + 1 * 8 + 0 * 16 + 0 * 32 + 0 * 64 + 1 * 128, // 2
+    1 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 0 * 16 + 1 * 32 + 0 * 64 + 1 * 128, // 3
+    0 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 0 * 64 + 0 * 128, // 4
+    1 * 1 + 0 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 0 * 64 + 1 * 128, // 5
+    1 * 1 + 0 * 2 + 1 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 0 * 64 + 1 * 128, // 6
+    1 * 1 + 1 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 1 * 32 + 0 * 64 + 0 * 128, // 7
+    1 * 1 + 1 * 2 + 1 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 0 * 64 + 0 * 128, // 8
+    1 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 0 * 64 + 1 * 128, // 9
+    0 * 1 + 0 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 0 * 32 + 1 * 64 + 0 * 128, // DP
+};
+
+// GPIO pin driving digit        0   1   2   3  4   5   DP
+unsigned char const digits[7] = {14, 13, 11, 9, 12, 10, 8};
+
+struct {
+    unsigned char digits[7];
+    unsigned char position;
+} display_s;
+
+/**
+ * This function is called periodically.
+ * In every call the digit indicated by display_s.position is driven with
+ * the pattern given by display_s.digit[position]
+ */
+void display_update(void) {
+    display_s.position += 1;
+    if (display_s.position > 6) {
+        display_s.position = 0;
+    }
+    printf("%d : %d -> %02X\n", display_s.position, digits[display_s.position], display_s.digits[display_s.position]);
+}
+
+
+/*
+    Set display contents.
+
+    Args:
+        content: array with 3 unsigned chars, [left, middle, right] content
+        dp: bool, stands for 'decimal point', true means on, false means off
+*/
+void display_set(unsigned char *content, bool dp) {
+    unsigned char index;
+    char buffer[4];
+    for (index = 0; index < 3; index++) {
+        sprintf(buffer, "%02d", content[index]);
+        display_s.digits[index * 2 + 0] = segments[buffer[0] - '0'];
+        display_s.digits[index * 2 + 1] = segments[buffer[1] - '0'];
+        display_s.digits[6] = dp == true ? segments[10] : 0;
+    }
+}
+
+
+void _main() {
     initialize();
 
     receive_s.count = 0;
@@ -300,5 +377,67 @@ void main() {
             printf("%s", asctime(&tm));
         }
         localtime_update();
+    }
+}
+
+void __main() {
+    int index;
+    unsigned char content[3] = {12, 34, 56};
+
+    initialize();
+    //while (true) {
+    while (ticks_ms() < 10000) {
+        gpio_put(LED_PIN, 1);
+        busy_wait_ms(500);
+        gpio_put(LED_PIN, 0);
+        busy_wait_ms(500);
+        printf("%d\n", ticks_ms());
+    }
+
+    for (index = 0; index < 11; index++) {
+        printf("%d: %02X\n", index, segments[index]);
+    }
+    display_set(content, true);
+    for (index = 0; index < 7; index++) {
+        display_update();
+    }
+    while (true) {};
+}
+
+
+
+void main() {
+    unsigned char buttonState = 0;
+    unsigned char lastButtonState = 0;
+    unsigned char reading;
+    bool ledState = true;
+    int64_t lastDebounceTime = 0;
+    int64_t debounceDelay = 50;
+
+    initialize();
+    gpio_put(LED_PIN, ledState);
+
+    while (true) {
+        reading = gpio_get(PIN_BUTTON);
+        if (reading != lastButtonState) {
+            // reset the debouncing timer
+            lastDebounceTime = ticks_ms();
+        }
+        if ((ticks_ms() - lastDebounceTime) > debounceDelay) {
+            // whatever the reading is at, it's been there for longer than the debounce
+            // delay, so take it as the actual current state:
+
+            // if the button state has changed:
+            if (reading != buttonState) {
+                buttonState = reading;
+
+                // only toggle the LED if the new button state is HIGH
+                if (buttonState == 1) {
+                    ledState = !ledState;
+                }
+            }
+        }
+        gpio_put(LED_PIN, ledState);
+        lastButtonState = reading;
     }
 }
