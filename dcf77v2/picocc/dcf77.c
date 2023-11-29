@@ -405,39 +405,65 @@ void __main() {
 }
 
 
+struct {
+    unsigned char currentButtonState;
+    unsigned char lastButtonState;
+    unsigned char readingButton;
+    bool buttonChanged;
+    int64_t lastDebounceTime;
+    int64_t debounceDelay;
+
+    int64_t tbutton;
+    unsigned char level;
+} button_s;
+
+
+void getButton() {
+    button_s.readingButton = gpio_get(PIN_BUTTON);
+    if (button_s.readingButton != button_s.lastButtonState) {
+        // reset the debouncing timer
+        button_s.lastDebounceTime = ticks_ms();
+    }
+    if ((ticks_ms() - button_s.lastDebounceTime) > button_s.debounceDelay) {
+        // whatever the button_s.readingButton is at, it's been there for longer than the debounce
+        // delay, so take it as the actual current state:
+
+        // if the button state has changed:
+        if (button_s.readingButton != button_s.currentButtonState) {
+            button_s.currentButtonState = button_s.readingButton;
+            button_s.buttonChanged = true;
+            // only toggle the LED if the new button state is LOW
+        }
+    }
+    button_s.lastButtonState = button_s.readingButton;
+}
 
 void main() {
-    unsigned char buttonState = 1;
-    unsigned char lastButtonState = 1;
-    unsigned char reading;
-    bool ledState = true;
-    int64_t lastDebounceTime = 0;
-    int64_t debounceDelay = 50;
-
     initialize();
-    gpio_put(LED_PIN, ledState);
+
+    button_s.currentButtonState = 1;
+    button_s.lastButtonState = 1;
+    button_s.lastDebounceTime = 0;
+    button_s.debounceDelay = 50;
+    button_s.buttonChanged = false;
+    button_s.level = 0;
 
     while (true) {
-        reading = gpio_get(PIN_BUTTON);
-        if (reading != lastButtonState) {
-            // reset the debouncing timer
-            lastDebounceTime = ticks_ms();
-        }
-        if ((ticks_ms() - lastDebounceTime) > debounceDelay) {
-            // whatever the reading is at, it's been there for longer than the debounce
-            // delay, so take it as the actual current state:
+        getButton();
+        if (button_s.buttonChanged == true) {
+            logfn(DEBUG, "buttonState %d\n", button_s.currentButtonState);
+            button_s.buttonChanged = false;
 
-            // if the button state has changed:
-            if (reading != buttonState) {
-                buttonState = reading;
-
-                // only toggle the LED if the new button state is LOW
-                if (buttonState == 0) {
-                    ledState = !ledState;
-                }
+            if (button_s.currentButtonState == 0) {
+                button_s.level = button_s.level > 1 ? 0 : button_s.level + 1;
+                logfn(INFO, "level=%i\n", button_s.level);
+                button_s.tbutton = ticks_ms();
             }
         }
-        gpio_put(LED_PIN, ledState);
-        lastButtonState = reading;
+
+        if (button_s.level > 0 && ticks_ms() - button_s.tbutton > 10000) {
+            logfn(INFO, "level <- 0\n");
+            button_s.level = 0;
+        }
     }
 }
