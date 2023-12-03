@@ -72,13 +72,58 @@ struct tm tm;
 
 void initialize() {
     stdio_init_all();
+
+    // initialize all uses pins
+    // 33222222222211111111110000000000
+    // 10987654321098765432109876543210
+    // 00010010000000001111111111111111 = 1200FFFF
+    // 0001 0010 0000 0000 1111 1111 1111 1111 = 1200FFFF
+    gpio_init_mask(0x1200FFFF);
+
+    // set all output and input pins
+    // 33222222222211111111110000000000
+    // 10987654321098765432109876543210
+    // 00000000000000000111111111111111
+    // 0000 0000 0000 0000 0111 1111 1111 1111 = 00007FFF
+    gpio_set_dir_masked(0x1200FFFF, 0x00007FFF);
+    // use pullup for button pin
+    gpio_pull_up(PIN_BUTTON);
+    return
+
+    gpio_set_dir_out_masked(0x00007FFF);
+    // set pin 28 (PIN_IN) and pin 15 (PIN_BUTTON) as input
+    // 33222222222211111111110000000000
+    // 10987654321098765432109876543210
+    // 00010000000000001000000000000000 = 10008000
+    // 0001 0000 0000 0000 1000 0000 0000 0000 = 10008000
+    gpio_set_dir_in_masked(0x10008000);
+    return
+
     gpio_init(LED_PIN);
     gpio_init(PIN_IN);
     gpio_init(PIN_BUTTON);
     gpio_set_dir(LED_PIN, GPIO_OUT);
     gpio_set_dir(PIN_IN, GPIO_IN);
     gpio_set_dir(PIN_BUTTON, GPIO_IN);
-    gpio_pull_up(PIN_BUTTON);
+
+    // 00000000 00000000
+    // initialize segment driver outputs
+    gpio_set_dir(0, GPIO_OUT);
+    gpio_set_dir(1, GPIO_OUT);
+    gpio_set_dir(2, GPIO_OUT);
+    gpio_set_dir(3, GPIO_OUT);
+    gpio_set_dir(4, GPIO_OUT);
+    gpio_set_dir(5, GPIO_OUT);
+    gpio_set_dir(6, GPIO_OUT);
+    gpio_set_dir(7, GPIO_OUT);
+    // initialize cathode driver outputs
+    gpio_set_dir(8, GPIO_OUT);
+    gpio_set_dir(9, GPIO_OUT);
+    gpio_set_dir(10, GPIO_OUT);
+    gpio_set_dir(11, GPIO_OUT);
+    gpio_set_dir(12, GPIO_OUT);
+    gpio_set_dir(13, GPIO_OUT);
+    gpio_set_dir(14, GPIO_OUT);
 }
 
 
@@ -296,16 +341,16 @@ unsigned char const segments[11] = {
 // Used by function  gpio_set_mask(uint32_t mask)
 //   -------------------------GPIO------------------------------------
 //  0       1       2       3       4        5        6        7
-    1 * 1 + 1 * 2 + 1 * 4 + 0 * 8 + 1 * 16 + 1 * 32 + 0 * 64 + 1 * 128, // 0
-    0 * 1 + 1 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 1 * 32 + 0 * 64 + 0 * 128, // 1
-    1 * 1 + 1 * 2 + 1 * 4 + 1 * 8 + 0 * 16 + 0 * 32 + 0 * 64 + 1 * 128, // 2
-    1 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 0 * 16 + 1 * 32 + 0 * 64 + 1 * 128, // 3
-    0 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 0 * 64 + 0 * 128, // 4
-    1 * 1 + 0 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 0 * 64 + 1 * 128, // 5
-    1 * 1 + 0 * 2 + 1 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 0 * 64 + 1 * 128, // 6
-    1 * 1 + 1 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 1 * 32 + 0 * 64 + 0 * 128, // 7
-    1 * 1 + 1 * 2 + 1 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 0 * 64 + 0 * 128, // 8
-    1 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 0 * 64 + 1 * 128, // 9
+    1 * 1 + 1 * 2 + 1 * 4 + 0 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 0
+    0 * 1 + 1 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 1
+    1 * 1 + 1 * 2 + 1 * 4 + 1 * 8 + 0 * 16 + 0 * 32 + 1 * 64 + 1 * 128, // 2
+    1 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 0 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 3
+    0 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 4
+    1 * 1 + 0 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 5
+    1 * 1 + 0 * 2 + 1 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 6
+    1 * 1 + 1 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 7
+    1 * 1 + 1 * 2 + 1 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 8
+    1 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 9
     0 * 1 + 0 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 0 * 32 + 1 * 64 + 0 * 128, // DP
 };
 
@@ -313,9 +358,19 @@ unsigned char const segments[11] = {
 unsigned char const digits[7] = {14, 13, 11, 9, 12, 10, 8};
 
 struct {
-    unsigned char digits[7];
+    unsigned char digits[6];
     unsigned char position;
+    bool dp;
 } display_s;
+
+
+void wait_for_key() {
+    int c;
+    puts("press '.' to continue");
+    do {
+        c = getchar();
+    } while (c != '.');
+}
 
 /**
  * This function is called periodically.
@@ -324,10 +379,18 @@ struct {
  */
 void display_update(void) {
     display_s.position += 1;
-    if (display_s.position > 6) {
+    if (display_s.position > 5) {
         display_s.position = 0;
     }
-    printf("%d : %d -> %02X\n", display_s.position, digits[display_s.position], display_s.digits[display_s.position]);
+    // printf("%d : %d -> %02X\n", display_s.position, digits[display_s.position], display_s.digits[display_s.position]);
+    // 33222222222211111111110000000000
+    // 10987654321098765432109876543210
+    // 11111111111111111111111011111111
+    // 1111 1111 1111 1111 1111 1110 1111 1111
+    // clear all bits except dp
+    gpio_clr_mask(0xFFFFFEFF);
+    // set all bits required to show digit
+    gpio_set_mask(display_s.digits[display_s.position] | (1 << digits[display_s.position]));
 }
 
 
@@ -338,15 +401,23 @@ void display_update(void) {
         content: array with 3 unsigned chars, [left, middle, right] content
         dp: bool, stands for 'decimal point', true means on, false means off
 */
-void display_set(unsigned char *content, bool dp) {
+void display_set(unsigned char *content) {
     unsigned char index;
     char buffer[4];
     for (index = 0; index < 3; index++) {
         sprintf(buffer, "%02d", content[index]);
         display_s.digits[index * 2 + 0] = segments[buffer[0] - '0'];
         display_s.digits[index * 2 + 1] = segments[buffer[1] - '0'];
-        display_s.digits[6] = dp == true ? segments[10] : 0;
     }
+    printf("digits=");
+    for (index = 0; index < 6; index++) {
+        printf("%02X ", display_s.digits[index]);
+    }
+    printf("\n");
+}
+
+void display_dp(bool on) {
+    gpio_put(8, on ? 1 : 0);
 }
 
 
@@ -380,9 +451,11 @@ void _main() {
     }
 }
 
-void __main() {
+void display_test() {
     int index;
-    unsigned char content[3] = {12, 34, 56};
+    int64_t t, tu, tdp;
+    bool dp;
+    unsigned char content[3] = {65, 43, 21};
 
     initialize();
     //while (true) {
@@ -391,17 +464,55 @@ void __main() {
         busy_wait_ms(500);
         gpio_put(LED_PIN, 0);
         busy_wait_ms(500);
-        printf("%d\n", ticks_ms());
+        printf("%lld\n", ticks_ms());
+    }
+    for (index = 0; index < 11; index++) {
+        printf("%02d -> %04X\n", index, segments[index]);
     }
 
-    for (index = 0; index < 11; index++) {
-        printf("%d: %02X\n", index, segments[index]);
+
+    int c, segment, digit;
+    if (false) {
+        for (index = 0; index < 11; index++) {
+            printf("%d: %02X\n", index, segments[index]);
+        }
+
+        for (digit=0; digit<6; digit++) {
+            for (segment=0; segment < 8; segment++) {
+                gpio_put(segment, 1);
+                gpio_put(digits[digit], 1);
+                printf("press key\n");
+
+                printf("segment %2d: press '.' to continue\n", segment);
+                do {
+                    c=getchar();
+                    putchar (c);
+                } while (c != '.');
+
+                gpio_put(segment, 0);
+                gpio_put(digits[digit], 0);
+            }
+        }
+        printf("done\n");
     }
-    display_set(content, true);
-    for (index = 0; index < 7; index++) {
-        display_update();
-    }
-    while (true) {};
+
+
+    display_set(content);
+
+    tdp = ticks_ms();
+    tu = tdp;
+    while (true) {
+        t = ticks_ms();
+        if (t - tu > 2) {
+            tu = t;
+            display_update();
+        }
+        if (t - tdp > 1000) {
+            tdp = t;
+            display_dp(dp);
+            dp = !dp;
+        }
+    };
 }
 
 
@@ -438,7 +549,7 @@ void getButton() {
     button_s.lastButtonState = button_s.readingButton;
 }
 
-void main() {
+void __main() {
     initialize();
 
     button_s.currentButtonState = 1;
@@ -466,4 +577,9 @@ void main() {
             button_s.level = 0;
         }
     }
+}
+
+void main() {
+    display_test();
+    //__main();
 }
