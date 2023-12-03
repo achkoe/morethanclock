@@ -23,25 +23,24 @@ cmake ..
 // Log levels
 #define DEBUG 10
 #define INFO 20
-#define LOGLEVEL INFO
+#define LOGLEVEL DEBUG
 
 
 const uint LED_PIN = 25;
 const uint PIN_IN = 28;
 const uint PIN_BUTTON = 15;
 
-typedef struct {
+struct {
     unsigned char state;
     char ppin;
     int64_t t;
     int64_t tstart;
     int count;
     unsigned char recvbuffer[61];
-} receive_t;
+} receive_s;
 
-receive_t receive_s;
 
-typedef struct {
+struct {
     unsigned char mesz;
     unsigned char mez_mesz_anounce;
     unsigned char leapsecond_anounce;
@@ -55,17 +54,15 @@ typedef struct {
     unsigned int year;
     unsigned char date_valid;
     unsigned char frame_valid;
-} dcf77_t;
+} dcf77_s;
 
-dcf77_t dcf77;
 
-typedef struct {
+struct {
     int64_t t;
     time_t localtime;
     unsigned char update;
-} localtime_t;
+} localtime_s;
 
-localtime_t localtime_s;
 
 struct tm tm;
 
@@ -97,7 +94,7 @@ unsigned char const segments[11] = {
     1 * 1 + 0 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 5
     1 * 1 + 0 * 2 + 1 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 6
     1 * 1 + 1 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 7
-    1 * 1 + 1 * 2 + 1 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 8
+    1 * 1 + 1 * 2 + 1 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 8
     1 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 9
     0 * 1 + 0 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 0 * 32 + 1 * 64 + 0 * 128, // DP
 };
@@ -286,37 +283,37 @@ void decode() {
     int index, count;
 
     if ((receive_s.recvbuffer[0] != 0) || (receive_s.recvbuffer[20] != 1)) {
-        dcf77.frame_valid = 0;
+        dcf77_s.frame_valid = 0;
         return;
     }
-    dcf77.mesz = (receive_s.recvbuffer[17] == 1) && (receive_s.recvbuffer[18] == 0);
-    dcf77.mez_mesz_anounce = receive_s.recvbuffer[16] == 1;
-    dcf77.leapsecond_anounce = receive_s.recvbuffer[19] == 1;
+    dcf77_s.mesz = (receive_s.recvbuffer[17] == 1) && (receive_s.recvbuffer[18] == 0);
+    dcf77_s.mez_mesz_anounce = receive_s.recvbuffer[16] == 1;
+    dcf77_s.leapsecond_anounce = receive_s.recvbuffer[19] == 1;
 
     count = 0;
     for (index = 36; index < 58; index++) {
         count += receive_s.recvbuffer[index];
     }
-    dcf77.date_valid = count % 2 == receive_s.recvbuffer[58];
+    dcf77_s.date_valid = count % 2 == receive_s.recvbuffer[58];
 
     count = 0;
     for (index = 21; index < 28; index++) {
         count += receive_s.recvbuffer[index];
     }
-    dcf77.minute_valid = count % 2 == receive_s.recvbuffer[28];
+    dcf77_s.minute_valid = count % 2 == receive_s.recvbuffer[28];
 
     count = 0;
     for (index = 29; index < 35; index++) {
         count += receive_s.recvbuffer[index];
     }
-    dcf77.hour_valid = count % 2 == receive_s.recvbuffer[35];
+    dcf77_s.hour_valid = count % 2 == receive_s.recvbuffer[35];
 
-    dcf77.minute = receive_s.recvbuffer[21] * 1 + receive_s.recvbuffer[22] * 2 + receive_s.recvbuffer[23] * 4 + receive_s.recvbuffer[24] * 8 + receive_s.recvbuffer[25] * 10 + receive_s.recvbuffer[26] * 20 + receive_s.recvbuffer[27] * 40;
-    dcf77.hour = receive_s.recvbuffer[29] * 1 + receive_s.recvbuffer[30] * 2 + receive_s.recvbuffer[31] * 4 + receive_s.recvbuffer[32] * 8 + receive_s.recvbuffer[33] * 10 + receive_s.recvbuffer[34] * 20;
-    dcf77.day_of_month = receive_s.recvbuffer[36] * 1 + receive_s.recvbuffer[37] * 2 + receive_s.recvbuffer[38] * 4 + receive_s.recvbuffer[39] * 8 + receive_s.recvbuffer[40] * 10 + receive_s.recvbuffer[41] * 20;
-    dcf77.day_of_week = receive_s.recvbuffer[42] * 1 + receive_s.recvbuffer[43] * 2 + receive_s.recvbuffer[44] * 4;
-    dcf77.month = receive_s.recvbuffer[45] * 1 + receive_s.recvbuffer[46] * 2 + receive_s.recvbuffer[47] * 4 + receive_s.recvbuffer[48] * 8 + receive_s.recvbuffer[49] * 10;
-    dcf77.year = 2000 + receive_s.recvbuffer[50] * 1 + receive_s.recvbuffer[51] * 2 + receive_s.recvbuffer[52] * 4 + receive_s.recvbuffer[53] * 8 + receive_s.recvbuffer[54] * 10 + receive_s.recvbuffer[55] * 20 + receive_s.recvbuffer[56] * 40 + receive_s.recvbuffer[57] * 80;
+    dcf77_s.minute = receive_s.recvbuffer[21] * 1 + receive_s.recvbuffer[22] * 2 + receive_s.recvbuffer[23] * 4 + receive_s.recvbuffer[24] * 8 + receive_s.recvbuffer[25] * 10 + receive_s.recvbuffer[26] * 20 + receive_s.recvbuffer[27] * 40;
+    dcf77_s.hour = receive_s.recvbuffer[29] * 1 + receive_s.recvbuffer[30] * 2 + receive_s.recvbuffer[31] * 4 + receive_s.recvbuffer[32] * 8 + receive_s.recvbuffer[33] * 10 + receive_s.recvbuffer[34] * 20;
+    dcf77_s.day_of_month = receive_s.recvbuffer[36] * 1 + receive_s.recvbuffer[37] * 2 + receive_s.recvbuffer[38] * 4 + receive_s.recvbuffer[39] * 8 + receive_s.recvbuffer[40] * 10 + receive_s.recvbuffer[41] * 20;
+    dcf77_s.day_of_week = receive_s.recvbuffer[42] * 1 + receive_s.recvbuffer[43] * 2 + receive_s.recvbuffer[44] * 4;
+    dcf77_s.month = receive_s.recvbuffer[45] * 1 + receive_s.recvbuffer[46] * 2 + receive_s.recvbuffer[47] * 4 + receive_s.recvbuffer[48] * 8 + receive_s.recvbuffer[49] * 10;
+    dcf77_s.year = 2000 + receive_s.recvbuffer[50] * 1 + receive_s.recvbuffer[51] * 2 + receive_s.recvbuffer[52] * 4 + receive_s.recvbuffer[53] * 8 + receive_s.recvbuffer[54] * 10 + receive_s.recvbuffer[55] * 20 + receive_s.recvbuffer[56] * 40 + receive_s.recvbuffer[57] * 80;
 }
 
 
@@ -326,18 +323,18 @@ void dcf77_show_frame() {
         logfn(INFO, "%c", receive_s.recvbuffer[receive_s.count] ? '1': '0');
     }
     logfn(INFO, "\n");
-    logfn(INFO, "hour=%d\n", dcf77.hour);
-    logfn(INFO, "minute=%d\n", dcf77.minute);
-    logfn(INFO, "day_of_month=%d\n", dcf77.day_of_month);
-    logfn(INFO, "month=%d\n", dcf77.month);
-    logfn(INFO, "year=%d\n", dcf77.year);
-    logfn(INFO, "day_of_week=%d\n", dcf77.day_of_week);
-    logfn(INFO, "hour_valid=%d\n", dcf77.hour_valid);
-    logfn(INFO, "minute_valid=%d\n", dcf77.minute_valid);
-    logfn(INFO, "date_valid=%d\n", dcf77.date_valid);
-    logfn(INFO, "mesz=%d\n", dcf77.mesz);
-    logfn(INFO, "mez_mesz_anounce=%d\n", dcf77.mez_mesz_anounce);
-    logfn(INFO, "leapsecond_anounce=%d\n", dcf77.leapsecond_anounce);
+    logfn(INFO, "hour=%d\n", dcf77_s.hour);
+    logfn(INFO, "minute=%d\n", dcf77_s.minute);
+    logfn(INFO, "day_of_month=%d\n", dcf77_s.day_of_month);
+    logfn(INFO, "month=%d\n", dcf77_s.month);
+    logfn(INFO, "year=%d\n", dcf77_s.year);
+    logfn(INFO, "day_of_week=%d\n", dcf77_s.day_of_week);
+    logfn(INFO, "hour_valid=%d\n", dcf77_s.hour_valid);
+    logfn(INFO, "minute_valid=%d\n", dcf77_s.minute_valid);
+    logfn(INFO, "date_valid=%d\n", dcf77_s.date_valid);
+    logfn(INFO, "mesz=%d\n", dcf77_s.mesz);
+    logfn(INFO, "mez_mesz_anounce=%d\n", dcf77_s.mez_mesz_anounce);
+    logfn(INFO, "leapsecond_anounce=%d\n", dcf77_s.leapsecond_anounce);
 }
 
 
@@ -359,18 +356,18 @@ void localtime_update() {
 */
 void synchronize() {
     tm = *localtime(&localtime_s.localtime);
-    if (dcf77.hour_valid == 1) {
-        tm.tm_hour = dcf77.hour;
+    if (dcf77_s.hour_valid == 1) {
+        tm.tm_hour = dcf77_s.hour;
     }
-    if (dcf77.minute_valid == 1) {
-        tm.tm_min = dcf77.minute == 59 ? 0 : dcf77.minute + 1;
+    if (dcf77_s.minute_valid == 1) {
+        tm.tm_min = dcf77_s.minute == 59 ? 0 : dcf77_s.minute + 1;
     }
     tm.tm_sec = 0;
-    tm.tm_isdst = dcf77.mesz;
-    if (dcf77.date_valid == 1) {
-        tm.tm_mon = dcf77.month - 1;
-        tm.tm_year = dcf77.year - 1900;
-        tm.tm_mday = dcf77.day_of_month;
+    tm.tm_isdst = dcf77_s.mesz;
+    if (dcf77_s.date_valid == 1) {
+        tm.tm_mon = dcf77_s.month - 1;
+        tm.tm_year = dcf77_s.year - 1900;
+        tm.tm_mday = dcf77_s.day_of_month;
     }
     localtime_s.localtime = mktime(&tm);
     localtime_s.t = ticks_ms();
@@ -555,6 +552,9 @@ void test_button() {
 
 
 void _main() {
+    unsigned char content[3];
+    int64_t t_update;
+
     initialize();
 
     receive_s.count = 0;
@@ -565,6 +565,8 @@ void _main() {
     receive_s.t = ticks_ms();
 
     localtime_s.localtime = 0;
+
+    t_update = ticks_ms();
 
     while (1) {
         dcf77_receive();
@@ -578,14 +580,23 @@ void _main() {
         if (localtime_s.update == 1) {
             localtime_s.update = 0;
             tm = *localtime(&localtime_s.localtime);
+            content[0] = tm.tm_hour;
+            content[1] = tm.tm_min;
+            content[2] = tm.tm_sec;
+            display_set(content);
             printf("%s", asctime(&tm));
         }
         localtime_update();
+
+        if (ticks_ms() - t_update > 2) {
+            t_update = ticks_ms();
+            display_update();
+        }
     }
 }
 
 
 void main() {
-    test_display();
-    //__main();
+    //test_display();
+    _main();
 }
