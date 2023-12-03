@@ -70,6 +70,62 @@ localtime_t localtime_s;
 struct tm tm;
 
 
+/*
+ *    number  0  1  2  3  4  5  6  7  8  9
+ * segment a  1  0  1  1  0  1  1  1  1  1  GPIO0
+ * segment b  1  1  1  1  1  0  0  1  1  1  GPIO1
+ * segment c  1  1  0  1  1  1  1  1  1  1  GPIO5
+ * segment d  1  0  1  1  0  1  1  0  1  1  GPIO7
+ * segment e  1  0  1  0  0  0  1  0  1  0  GPIO2
+ * segment f  1  0  0  0  1  1  1  0  1  1  GPIO4
+ * segment g  0  0  1  1  1  1  1  0  1  1  GPIO3
+ * dp                                       GPIO6
+*/
+
+unsigned char const segments[11] = {
+// Each value in this array represents the segments for displaying a number
+// in a 7 segment display. The number corresponds to the index in the array.
+// The segments are driven by GPIO as shown in comment.
+// Used by function  gpio_set_mask(uint32_t mask)
+//   -------------------------GPIO------------------------------------
+//  0       1       2       3       4        5        6        7
+    1 * 1 + 1 * 2 + 1 * 4 + 0 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 0
+    0 * 1 + 1 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 1
+    1 * 1 + 1 * 2 + 1 * 4 + 1 * 8 + 0 * 16 + 0 * 32 + 1 * 64 + 1 * 128, // 2
+    1 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 0 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 3
+    0 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 4
+    1 * 1 + 0 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 5
+    1 * 1 + 0 * 2 + 1 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 6
+    1 * 1 + 1 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 7
+    1 * 1 + 1 * 2 + 1 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 8
+    1 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 9
+    0 * 1 + 0 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 0 * 32 + 1 * 64 + 0 * 128, // DP
+};
+
+// GPIO pin driving digit        0   1   2   3  4   5   DP
+unsigned char const digits[7] = {14, 13, 11, 9, 12, 10, 8};
+
+
+struct {
+    unsigned char digits[6];
+    unsigned char position;
+    bool dp;
+} display_s;
+
+
+struct {
+    unsigned char currentButtonState;
+    unsigned char lastButtonState;
+    unsigned char readingButton;
+    bool buttonChanged;
+    int64_t lastDebounceTime;
+    int64_t debounceDelay;
+
+    int64_t tbutton;
+    unsigned char level;
+} button_s;
+
+
 void initialize() {
     stdio_init_all();
 
@@ -322,56 +378,6 @@ void synchronize() {
 }
 
 
-/*
- *    number  0  1  2  3  4  5  6  7  8  9
- * segment a  1  0  1  1  0  1  1  1  1  1  GPIO0
- * segment b  1  1  1  1  1  0  0  1  1  1  GPIO1
- * segment c  1  1  0  1  1  1  1  1  1  1  GPIO5
- * segment d  1  0  1  1  0  1  1  0  1  1  GPIO7
- * segment e  1  0  1  0  0  0  1  0  1  0  GPIO2
- * segment f  1  0  0  0  1  1  1  0  1  1  GPIO4
- * segment g  0  0  1  1  1  1  1  0  1  1  GPIO3
- * dp                                       GPIO6
-*/
-
-unsigned char const segments[11] = {
-// Each value in this array represents the segments for displaying a number
-// in a 7 segment display. The number corresponds to the index in the array.
-// The segments are driven by GPIO as shown in comment.
-// Used by function  gpio_set_mask(uint32_t mask)
-//   -------------------------GPIO------------------------------------
-//  0       1       2       3       4        5        6        7
-    1 * 1 + 1 * 2 + 1 * 4 + 0 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 0
-    0 * 1 + 1 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 1
-    1 * 1 + 1 * 2 + 1 * 4 + 1 * 8 + 0 * 16 + 0 * 32 + 1 * 64 + 1 * 128, // 2
-    1 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 0 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 3
-    0 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 4
-    1 * 1 + 0 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 5
-    1 * 1 + 0 * 2 + 1 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 6
-    1 * 1 + 1 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 7
-    1 * 1 + 1 * 2 + 1 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 0 * 128, // 8
-    1 * 1 + 1 * 2 + 0 * 4 + 1 * 8 + 1 * 16 + 1 * 32 + 1 * 64 + 1 * 128, // 9
-    0 * 1 + 0 * 2 + 0 * 4 + 0 * 8 + 0 * 16 + 0 * 32 + 1 * 64 + 0 * 128, // DP
-};
-
-// GPIO pin driving digit        0   1   2   3  4   5   DP
-unsigned char const digits[7] = {14, 13, 11, 9, 12, 10, 8};
-
-struct {
-    unsigned char digits[6];
-    unsigned char position;
-    bool dp;
-} display_s;
-
-
-void wait_for_key() {
-    int c;
-    puts("press '.' to continue");
-    do {
-        c = getchar();
-    } while (c != '.');
-}
-
 /**
  * This function is called periodically.
  * In every call the digit indicated by display_s.position is driven with
@@ -416,42 +422,43 @@ void display_set(unsigned char *content) {
     printf("\n");
 }
 
+
 void display_dp(bool on) {
     gpio_put(8, on ? 1 : 0);
 }
 
 
-void _main() {
-    initialize();
-
-    receive_s.count = 0;
-    receive_s.recvbuffer[60] = 0;
-    receive_s.state = STATE_0;
-    receive_s.ppin = getpin();
-    receive_s.tstart = ticks_ms();
-    receive_s.t = ticks_ms();
-
-    localtime_s.localtime = 0;
-
-    while (1) {
-        dcf77_receive();
-        if (receive_s.count >= 59) {
-            decode();
-            dcf77_show_frame();
-            synchronize();
-            receive_s.count = 0;
-            receive_s.state = STATE_0;
-        }
-        if (localtime_s.update == 1) {
-            localtime_s.update = 0;
-            tm = *localtime(&localtime_s.localtime);
-            printf("%s", asctime(&tm));
-        }
-        localtime_update();
+void getButton() {
+    button_s.readingButton = gpio_get(PIN_BUTTON);
+    if (button_s.readingButton != button_s.lastButtonState) {
+        // reset the debouncing timer
+        button_s.lastDebounceTime = ticks_ms();
     }
+    if ((ticks_ms() - button_s.lastDebounceTime) > button_s.debounceDelay) {
+        // whatever the button_s.readingButton is at, it's been there for longer than the debounce
+        // delay, so take it as the actual current state:
+
+        // if the button state has changed:
+        if (button_s.readingButton != button_s.currentButtonState) {
+            button_s.currentButtonState = button_s.readingButton;
+            button_s.buttonChanged = true;
+            // only toggle the LED if the new button state is LOW
+        }
+    }
+    button_s.lastButtonState = button_s.readingButton;
 }
 
-void display_test() {
+
+void wait_for_key() {
+    int c;
+    puts("press '.' to continue");
+    do {
+        c = getchar();
+    } while (c != '.');
+}
+
+
+void test_display() {
     int index;
     int64_t t, tu, tdp;
     bool dp;
@@ -516,40 +523,7 @@ void display_test() {
 }
 
 
-struct {
-    unsigned char currentButtonState;
-    unsigned char lastButtonState;
-    unsigned char readingButton;
-    bool buttonChanged;
-    int64_t lastDebounceTime;
-    int64_t debounceDelay;
-
-    int64_t tbutton;
-    unsigned char level;
-} button_s;
-
-
-void getButton() {
-    button_s.readingButton = gpio_get(PIN_BUTTON);
-    if (button_s.readingButton != button_s.lastButtonState) {
-        // reset the debouncing timer
-        button_s.lastDebounceTime = ticks_ms();
-    }
-    if ((ticks_ms() - button_s.lastDebounceTime) > button_s.debounceDelay) {
-        // whatever the button_s.readingButton is at, it's been there for longer than the debounce
-        // delay, so take it as the actual current state:
-
-        // if the button state has changed:
-        if (button_s.readingButton != button_s.currentButtonState) {
-            button_s.currentButtonState = button_s.readingButton;
-            button_s.buttonChanged = true;
-            // only toggle the LED if the new button state is LOW
-        }
-    }
-    button_s.lastButtonState = button_s.readingButton;
-}
-
-void __main() {
+void test_button() {
     initialize();
 
     button_s.currentButtonState = 1;
@@ -579,7 +553,39 @@ void __main() {
     }
 }
 
+
+void _main() {
+    initialize();
+
+    receive_s.count = 0;
+    receive_s.recvbuffer[60] = 0;
+    receive_s.state = STATE_0;
+    receive_s.ppin = getpin();
+    receive_s.tstart = ticks_ms();
+    receive_s.t = ticks_ms();
+
+    localtime_s.localtime = 0;
+
+    while (1) {
+        dcf77_receive();
+        if (receive_s.count >= 59) {
+            decode();
+            dcf77_show_frame();
+            synchronize();
+            receive_s.count = 0;
+            receive_s.state = STATE_0;
+        }
+        if (localtime_s.update == 1) {
+            localtime_s.update = 0;
+            tm = *localtime(&localtime_s.localtime);
+            printf("%s", asctime(&tm));
+        }
+        localtime_update();
+    }
+}
+
+
 void main() {
-    display_test();
+    test_display();
     //__main();
 }
