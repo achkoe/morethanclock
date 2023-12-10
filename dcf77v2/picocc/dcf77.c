@@ -15,6 +15,9 @@ cmake ..
 #include <time.h>
 
 
+void display_dp(bool dp);
+
+
 // the states of DCF77 receiver
 #define STATE_0 0
 #define STATE_1 1
@@ -136,52 +139,16 @@ void initialize() {
     // set all output and input pins
     // 33222222222211111111110000000000
     // 10987654321098765432109876543210
-    // 00000000000000000111111111111111
-    // 0000 0000 0000 0000 0111 1111 1111 1111 = 00007FFF
-    gpio_set_dir_masked(0x1200FFFF, 0x00007FFF);
+    // 00000010000000000111111111111111
+    // 0000 0010 0000 0000 0111 1111 1111 1111 = 02007FFF
+    gpio_set_dir_masked(0x1200FFFF, 0x02007FFF);
     // use pullup for button pin
     gpio_pull_up(PIN_BUTTON);
-    return
-
-    gpio_set_dir_out_masked(0x00007FFF);
-    // set pin 28 (PIN_IN) and pin 15 (PIN_BUTTON) as input
-    // 33222222222211111111110000000000
-    // 10987654321098765432109876543210
-    // 00010000000000001000000000000000 = 10008000
-    // 0001 0000 0000 0000 1000 0000 0000 0000 = 10008000
-    gpio_set_dir_in_masked(0x10008000);
-    return
-
-    gpio_init(LED_PIN);
-    gpio_init(PIN_IN);
-    gpio_init(PIN_BUTTON);
-    gpio_set_dir(LED_PIN, GPIO_OUT);
-    gpio_set_dir(PIN_IN, GPIO_IN);
-    gpio_set_dir(PIN_BUTTON, GPIO_IN);
-
-    // 00000000 00000000
-    // initialize segment driver outputs
-    gpio_set_dir(0, GPIO_OUT);
-    gpio_set_dir(1, GPIO_OUT);
-    gpio_set_dir(2, GPIO_OUT);
-    gpio_set_dir(3, GPIO_OUT);
-    gpio_set_dir(4, GPIO_OUT);
-    gpio_set_dir(5, GPIO_OUT);
-    gpio_set_dir(6, GPIO_OUT);
-    gpio_set_dir(7, GPIO_OUT);
-    // initialize cathode driver outputs
-    gpio_set_dir(8, GPIO_OUT);
-    gpio_set_dir(9, GPIO_OUT);
-    gpio_set_dir(10, GPIO_OUT);
-    gpio_set_dir(11, GPIO_OUT);
-    gpio_set_dir(12, GPIO_OUT);
-    gpio_set_dir(13, GPIO_OUT);
-    gpio_set_dir(14, GPIO_OUT);
 }
 
 
 int getpin() {
-    return gpio_get(PIN_IN);
+    return !gpio_get(PIN_IN);
 }
 
 
@@ -206,6 +173,7 @@ void dcf77_receive() {
 
     pin = getpin();
     gpio_put(LED_PIN, pin);
+    display_dp(pin);
     tcurrent = ticks_ms();
     if (receive_s.state == STATE_0) {
         // syncing phase
@@ -360,7 +328,8 @@ void synchronize() {
         tm.tm_hour = dcf77_s.hour;
     }
     if (dcf77_s.minute_valid == 1) {
-        tm.tm_min = dcf77_s.minute == 59 ? 0 : dcf77_s.minute + 1;
+        // tm.tm_min = dcf77_s.minute == 59 ? 0 : dcf77_s.minute + 1;  // this
+        tm.tm_min = dcf77_s.minute;                                    // this or that
     }
     tm.tm_sec = 0;
     tm.tm_isdst = dcf77_s.mesz;
@@ -388,10 +357,10 @@ void display_update(void) {
     // printf("%d : %d -> %02X\n", display_s.position, digits[display_s.position], display_s.digits[display_s.position]);
     // 33222222222211111111110000000000
     // 10987654321098765432109876543210
-    // 11111111111111111111111011111111
-    // 1111 1111 1111 1111 1111 1110 1111 1111
+    // 11111101111111111111111011111111
+    // 1111 1101 1111 1111 1111 1110 1111 1111
     // clear all bits except dp
-    gpio_clr_mask(0xFFFFFEFF);
+    gpio_clr_mask(0xFDFFFEFF);
     // set all bits required to show digit
     gpio_set_mask(display_s.digits[display_s.position] | (1 << digits[display_s.position]));
 }
@@ -580,13 +549,41 @@ void _main() {
         if (localtime_s.update == 1) {
             localtime_s.update = 0;
             tm = *localtime(&localtime_s.localtime);
-            content[0] = tm.tm_hour;
-            content[1] = tm.tm_min;
-            content[2] = tm.tm_sec;
+
+            if (button_s.level == 0){
+                content[0] = tm.tm_hour;
+                content[1] = tm.tm_min;
+                content[2] = tm.tm_sec;
+            } else if (button_s.level == 1) {
+                content[0] = tm.tm_mday;
+                content[1] = tm.tm_mon + 1;
+                content[2] = tm.tm_year >= 100 ? tm.tm_year - 100 : tm.tm_year;
+            } else {
+                content[0] = 0;
+                content[1] = 0;
+                content[2] = 0;
+            }
+
             display_set(content);
-            printf("%s", asctime(&tm));
+            printf("%s", asctime(&tm), tm.tm_year);
         }
         localtime_update();
+
+        getButton();
+        if (button_s.buttonChanged == true) {
+            button_s.buttonChanged = false;
+
+            if (button_s.currentButtonState == 0) {
+                button_s.level = button_s.level > 1 ? 0 : button_s.level + 1;
+                logfn(INFO, "level=%i\n", button_s.level);
+                button_s.tbutton = ticks_ms();
+            }
+        }
+
+        if (button_s.level > 0 && ticks_ms() - button_s.tbutton > 10000) {
+            logfn(INFO, "level <- 0\n");
+            button_s.level = 0;
+        }
 
         if (ticks_ms() - t_update > 2) {
             t_update = ticks_ms();
