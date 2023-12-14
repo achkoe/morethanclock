@@ -9,6 +9,7 @@ cmake ..
 */
 
 #include <stdarg.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
@@ -69,6 +70,8 @@ struct {
 
 struct tm tm;
 
+/** time of last valid DCF time reception */
+time_t last_synchronization_time;
 
 /*
  *    number  0  1  2  3  4  5  6  7  8  9
@@ -341,6 +344,8 @@ void synchronize() {
     localtime_s.localtime = mktime(&tm);
     localtime_s.t = ticks_ms();
     localtime_s.update = 1;
+
+    last_synchronization_time = localtime_s.localtime;
 }
 
 
@@ -381,11 +386,11 @@ void display_set(unsigned char *content) {
         display_s.digits[index * 2 + 0] = segments[buffer[0] - '0'];
         display_s.digits[index * 2 + 1] = segments[buffer[1] - '0'];
     }
-    printf("digits=");
+    logfn(DEBUG,"digits=");
     for (index = 0; index < 6; index++) {
-        printf("%02X ", display_s.digits[index]);
+        logfn(DEBUG,"%02X ", display_s.digits[index]);
     }
-    printf("\n");
+    logfn(DEBUG,"\n");
 }
 
 
@@ -551,21 +556,28 @@ void _main() {
             tm = *localtime(&localtime_s.localtime);
 
             if (button_s.level == 0){
+                // normal display -> display hours, minutes, seconds
                 content[0] = tm.tm_hour;
                 content[1] = tm.tm_min;
                 content[2] = tm.tm_sec;
             } else if (button_s.level == 1) {
+                // button one time pressed -> display day of month, month, year
                 content[0] = tm.tm_mday;
                 content[1] = tm.tm_mon + 1;
                 content[2] = tm.tm_year >= 100 ? tm.tm_year - 100 : tm.tm_year;
             } else {
-                content[0] = 0;
-                content[1] = 0;
-                content[2] = 0;
+                // button two time pressed -> display day, hour, minute of time difference between now and last DCF77 reception
+                time_t tdelta = (time_t)difftime(localtime_s.localtime, last_synchronization_time);
+                lldiv_t quot_rem = lldiv(tdelta, 24 * 60 * 60);
+                content[0] = (unsigned char)quot_rem.quot < 100 ? (unsigned char)quot_rem.quot : 99;
+                quot_rem = lldiv(quot_rem.rem, 60 * 60);
+                content[1] = (unsigned char)quot_rem.quot < 100 ? (unsigned char)quot_rem.quot : 99;
+                quot_rem = lldiv(quot_rem.rem, 60);
+                content[2] = (unsigned char)quot_rem.quot < 100 ? (unsigned char)quot_rem.quot : 99;
+                logfn(INFO, "tdelta=%lld: content -> %d, %d, %d\n", tdelta, content[0], content[1], content[2]);
             }
-
             display_set(content);
-            printf("%s", asctime(&tm), tm.tm_year);
+            logfn(INFO, "%s", asctime(&tm));
         }
         localtime_update();
 
